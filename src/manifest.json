@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "YTCatalog",
+  "version": "1.0.0",
+  "description": "Organize YouTube playlists into folders",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content/youtube.js"],
+      "css": ["styles/dropdown.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  }
+}

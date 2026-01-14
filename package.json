@@ -1,0 +1,24 @@
+{
+  "name": "ytcatalog",
+  "version": "1.0.0",
+  "description": "A browser extension for organizing YouTube playlists into folders.",
+  "scripts": {
+    "build": "webpack --mode production",
+    "watch": "webpack --mode development --watch",
+    "dev": "web-ext run --source-dir ./dist/"
+  },
+  "keywords": ["youtube", "playlists", "browser-extension", "chrome-extension"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/chrome": "^0.1.33",
+    "copy-webpack-plugin": "^13.0.1",
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "web-ext": "^9.2.0",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^6.0.1"
+  }
+}

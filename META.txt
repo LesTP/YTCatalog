@@ -1,0 +1,105 @@
+This document defines the high-level rules and expectations for development work in this repository.
+
+
+~ DOCUMENTATION ~
+
+Documentation must provide enough context of intent, constraints, and decisions for a collaborator/model that starts cold each session.
+
+* You have no memory outside this repo.
+* If something is ambiguous, ASK (don’t guess).
+* Prioritize clarity over speed.
+
+Every project has the following three-file documentation structure:
+- DEVPLAN.md: Product vision, roadmap, requirements, design specs, decisions. Updated before each dev iteration.
+- DEVLOG.md: Implementation history, issues encountered, lessons learned. Updated after each dev iteration.
+- README.md: Cold start summary and links to both DEV docs. Updated upon major direction shifts.
+
+README opens with the cold start summary of 5-8 bullet points: 
+* What this is (e.g. This is a personal tool to explore X)
+* Current state [what works / what’s broken] (e.g. Core architecture is settled; avoid redesign)
+* Current focus (e.g. understand the data model and constraints)
+* Key constraints + gotchas (e.g. Several TODOs are placeholders, not bugs)
+Update the README only when project context shifts in a potentially misleading way (scope, focus, or core assumptions), not for routine code changes.
+
+
+When a decision is needed, present options following this template:
+
+```
+D-#: [Decision Title]
+Date: YYYY-MM-DD
+Status: Open / Closed
+
+Decision:
+Rationale:
+Trade-offs:
+Revisit if:
+```
+
+Rule: once marked **Closed**, don’t reopen unless new evidence appears.
+
+
+~ WORK MODES ~
+
+The session operates in one of three modes:
+- Discuss
+- Code/debug
+- Review
+
+- Discuss
+ -- involves documentation updates but NO code changes at all
+ -- every iteration starts with a discuss session
+ -- in making plans, prioritize the simplest solutions possible
+ -- always check existing architecture to see if elements can be used/extended
+ -- preserve existing architecture unless there’s a clear reason to change it; if changing, document using decision template
+ -- reuse existing structures/functions/names whenever possible
+ -- do not invent variable names, APIs, schemas, or file structures
+ -- if context is missing, ask before proceeding
+ -- consider and discuss edge cases, document decisions
+ -- every discuss section ends with a DEVPLAN update, and a README update if context has shifted
+
+- Code/debug: are distinct but the model will switch between them as needed in the course of the session.
+ -- Code: implement the plan made in the discuss session for this iteration.
+ -- Debug: propose specific testable hypothesis, only make code changes after testing.
+
+- Review:
+ -- the goal here is to improve existing code, not to write anything new
+ -- priority #1 is to preserve existing functionality
+ -- priority #2 is to optimize and simplify the code
+ -- for trade-offs between performance and simplicity, clarify explicitly by following the decision template
+ -- the outcome should ideally be less and simpler code than what we started with; more complexity is only okay if it results in notable performance improvement
+ -- confirm architecture alignment (we didn’t drift)
+ -- doc sync: ensure docs are up to date, make a pass to remove redundancies
+
+
+~ WORKFLOW ~
+
+Set-up/initial iteration (greenfield projects):
+- discuss the overall goal/purpose
+- define use cases
+- make architecture and tool choices
+- determine MVP
+- define specific features for this dev cycle and put everything else into "Future plans"
+- break into distinct individual features that can be worked on in separate sequential iterations called Phases
+- set up documentation and document everything in the README and DEVPLAN
+
+Actual dev phases, one phase per feature, each phase consisting of one or more steps:
+
+"Phase #n, feature" (e.g. Phase 5, add item to favorites), discuss mode only:
+- determine the scope of this phase and specific outcomes
+- break into smallest possible steps, to be implemented and tested individually (e.g. Phase 5a, create a favorites page; Phase 5b, add "fav_bool" field to the item table)
+- update DEVPLAN
+
+Implement individual steps (e.g. Phase 5b, add fav_bool field):
+- Discuss:
+ -- determine specific changes, tech specs, files to be changed/added
+ -- identify and document choices, discuss with user and document decisions using template
+ -- outline the testing procedures
+ -- update DEVPLAN
+- Code/debug
+- Update DEVLOG upon completion
+- Commit
+
+After a phase is completed, review.
+Update DEVLOG with any changes.
+Make one more pass to clean up documentation (remove redundancies, fix drift). 
+Commit.
