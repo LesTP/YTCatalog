@@ -9,11 +9,11 @@
   "host_permissions": [
     "*://*.youtube.com/*"
   ],
-  "content_scripts": [
+"content_scripts": [
     {
       "matches": ["*://*.youtube.com/*"],
       "js": ["content/youtube.js"],
-      "css": ["styles/dropdown.css"],
+      "css": ["styles/dropdown.css", "styles/modal.css"],
       "run_at": "document_end"
     }
   ],

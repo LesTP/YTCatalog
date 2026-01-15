@@ -1,0 +1,126 @@
+/**
+ * YTCatalog Modal Styles
+ * Styles for the organization modal
+ */
+
+/* ============================================================================
+   Modal Overlay
+   ============================================================================ */
+
+.ytcatalog-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.ytcatalog-modal-overlay.open {
+  display: flex;
+}
+
+/* ============================================================================
+   Modal Container
+   ============================================================================ */
+
+.ytcatalog-modal-container {
+  background-color: #212121;
+  border-radius: 12px;
+  width: 90vw;
+  max-width: 1200px;
+  height: 80vh;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================================================
+   Modal Header
+   ============================================================================ */
+
+.ytcatalog-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #3f3f3f;
+  flex-shrink: 0;
+}
+
+.ytcatalog-modal-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: #fff;
+  margin: 0;
+  font-family: 'Roboto', 'Arial', sans-serif;
+}
+
+.ytcatalog-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
+  width: 40px;
+  height: 40px;
+}
+
+.ytcatalog-modal-close svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.ytcatalog-modal-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.ytcatalog-modal-close:focus {
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================================================
+   Modal Body
+   ============================================================================ */
+
+.ytcatalog-modal-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ============================================================================
+   Sidebar (Phase 5b)
+   ============================================================================ */
+
+.ytcatalog-modal-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background-color: #181818;
+  border-right: 1px solid #3f3f3f;
+  overflow-y: auto;
+}
+
+/* ============================================================================
+   Content Area (Phase 5c)
+   ============================================================================ */
+
+.ytcatalog-modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}

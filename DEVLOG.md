@@ -347,6 +347,34 @@ Each entry follows this structure:
 
 ---
 
+### [2026-01-15] Phase 5a: Modal Structure & Open/Close
+
+#### What was done
+- Added "Organize..." menu item to dropdown (after "+ New Folder")
+- Created `src/content/modal.ts` with modal open/close logic
+- Created `src/styles/modal.css` with YouTube-matching dark theme styles
+- Modal shell: full-screen overlay, container (90vw×80vh), header with title and X close button
+- Close mechanisms: X button, Escape key, click outside modal
+- Updated manifest.json to include modal.css in content scripts
+- Initialized Git repository and pushed to GitHub
+
+#### Issues encountered
+- Close button (X icon) initially not visible due to missing explicit SVG sizing
+  - Fixed by adding `width: 40px; height: 40px` to button and `width: 24px; height: 24px` to SVG
+
+#### Lessons learned
+- SVGs in buttons need explicit sizing to be visible
+- Modal uses `position: fixed` with high z-index (9999) to overlay YouTube
+
+#### Files changed
+- Added: `src/content/modal.ts`
+- Added: `src/styles/modal.css`
+- Added: `.gitignore`
+- Modified: `src/content/youtube.ts` (import modal, add "Organize..." handler)
+- Modified: `src/manifest.json` (add modal.css to content scripts)
+
+---
+
 ## Issue Tracker
 
 | ID | Status | Description | Resolution |

@@ -5,6 +5,7 @@
 
 import { folderStorage, CreateFolderResult } from '../shared/storage';
 import { Folder } from '../shared/types';
+import { openModal } from './modal';
 
 
 // Pattern to detect the playlists library page (where all playlists are shown)
@@ -418,6 +419,7 @@ function buildMenuItems(folders: Record<string, Folder>, selectedId: string | nu
   // Separator before "New Folder"
   html += '<div class="ytcatalog-dropdown-separator"></div>';
   html += '<button class="ytcatalog-dropdown-item ytcatalog-new-folder" data-action="new-folder">+ New Folder</button>';
+  html += '<button class="ytcatalog-dropdown-item ytcatalog-organize" data-action="organize">Organize...</button>';
 
   return html;
 }
@@ -586,6 +588,13 @@ async function createDropdown(): Promise<HTMLElement> {
     if (target.dataset.action === 'new-folder') {
       dropdown.classList.remove('open');
       await handleNewFolder();
+      return;
+    }
+
+    // Handle "Organize..." action
+    if (target.dataset.action === 'organize') {
+      dropdown.classList.remove('open');
+      openModal();
       return;
     }
 
