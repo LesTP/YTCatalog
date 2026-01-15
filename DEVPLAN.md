@@ -411,6 +411,7 @@ ytd-rich-item-renderer[lockup="true"]
 ### Future Plans (Post-MVP)
 
 #### Phase 6 Candidates
+- [ ] **Thumbnail loading for off-screen playlists**: YouTube lazy-loads images; off-screen playlist thumbnails don't load. Consider placeholder images, title-only cards, or alternative scraping approach
 - [ ] **Bulk operations**: Multi-select playlists + bulk move to folder
 - [ ] **Drag-and-drop**: Add drag-and-drop as alternative to click-to-assign
 - [ ] **Save/Cancel workflow**: Add undo capability or Save/Cancel for modal changes

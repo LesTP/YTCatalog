@@ -79,9 +79,9 @@ function scrapePlaylistsForModal(): PlaylistInfo[] {
     const titleEl = card.querySelector('h3[title]') as HTMLElement;
     const title = titleEl?.getAttribute('title') || titleEl?.textContent || 'Unknown Playlist';
 
-    // Extract thumbnail
-    const thumbnailEl = card.querySelector('.ytThumbnailViewModelImage img') as HTMLImageElement;
-    const thumbnailUrl = thumbnailEl?.src || '';
+    // Extract thumbnail (basic scraping - may not work for all playlists due to YouTube lazy loading)
+    const thumbnailEl = card.querySelector('img') as HTMLImageElement;
+    const thumbnailUrl = (thumbnailEl?.src && !thumbnailEl.src.includes('data:')) ? thumbnailEl.src : '';
 
     playlists.push({
       id,
@@ -357,8 +357,27 @@ async function handleDeleteFolderInModal(folderId: string): Promise<void> {
 }
 
 // ============================================================================
-// Content Area (Phase 5c placeholder)
+// Content Area (Phase 5c - Playlist Grid)
 // ============================================================================
+
+/**
+ * Build the HTML for a single playlist card
+ */
+function buildPlaylistCardHTML(playlist: PlaylistInfo): string {
+  return `
+    <div class="ytcatalog-playlist-card" data-playlist-id="${playlist.id}">
+      <div class="ytcatalog-playlist-thumbnail">
+        ${playlist.thumbnailUrl
+          ? `<img src="${playlist.thumbnailUrl}" alt="${escapeHtml(playlist.title)}" loading="lazy" />`
+          : '<div class="ytcatalog-playlist-thumbnail-placeholder"></div>'
+        }
+      </div>
+      <div class="ytcatalog-playlist-info">
+        <span class="ytcatalog-playlist-title" title="${escapeHtml(playlist.title)}">${escapeHtml(playlist.title)}</span>
+      </div>
+    </div>
+  `;
+}
 
 /**
  * Render the content area (playlist grid)
@@ -383,13 +402,14 @@ function renderContent(): void {
     return;
   }
 
+  const playlistCardsHTML = playlists.map(p => buildPlaylistCardHTML(p)).join('');
+
   content.innerHTML = `
     <div class="ytcatalog-content-header">
       <h3>${escapeHtml(folderName)} (${playlists.length})</h3>
     </div>
-    <div class="ytcatalog-content-placeholder">
-      <p style="color: #aaa;">Playlist grid coming in Phase 5c</p>
-      <p style="color: #666; font-size: 12px;">${playlists.length} playlists to display</p>
+    <div class="ytcatalog-playlist-grid">
+      ${playlistCardsHTML}
     </div>
   `;
 }
