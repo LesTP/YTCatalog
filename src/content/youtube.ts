@@ -689,6 +689,12 @@ function observeNavigation(): void {
 init();
 observeNavigation();
 
+// Listen for folder changes from modal
+document.addEventListener('ytcatalog-folders-changed', async () => {
+  await refreshDropdownMenu();
+  await updateDropdownLabel();
+});
+
 // ============================================================================
 // Testing helper: Press Ctrl+Shift+Y to trigger test
 // Remove this in production

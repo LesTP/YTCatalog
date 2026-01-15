@@ -3,16 +3,396 @@
  * Full-screen modal for managing playlists and folders
  */
 
+import { folderStorage } from '../shared/storage';
+import { Folder } from '../shared/types';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface PlaylistInfo {
+  id: string;
+  title: string;
+  thumbnailUrl: string;
+}
+
 // ============================================================================
 // Modal State
 // ============================================================================
 
 let modalElement: HTMLElement | null = null;
 let isModalOpen = false;
+let selectedFolderId: string | null = null; // null = Unassigned
+let cachedFolders: Record<string, Folder> = {};
+let cachedPlaylists: PlaylistInfo[] = [];
 
 // ============================================================================
-// Modal Creation
+// Playlist Scraping (simplified for modal)
 // ============================================================================
+
+/**
+ * Scrape playlist info from the DOM for the modal.
+ * This is a simplified version that gets id, title, and thumbnail.
+ */
+function scrapePlaylistsForModal(): PlaylistInfo[] {
+  const gridContainer = document.querySelector('ytd-two-column-browse-results-renderer:not([page-subtype="home"])');
+  const searchRoot = gridContainer || document;
+  const cards = searchRoot.querySelectorAll('ytd-rich-item-renderer[lockup="true"]');
+  const playlists: PlaylistInfo[] = [];
+  const seenIds = new Set<string>();
+
+  cards.forEach((card) => {
+    // Extract playlist ID
+    const lockupDiv = card.querySelector('div.yt-lockup-view-model[class*="content-id-"]');
+    let id: string | null = null;
+
+    if (lockupDiv) {
+      const classMatch = lockupDiv.className.match(/content-id-([A-Za-z0-9_-]+)/);
+      if (classMatch && classMatch[1]) {
+        id = classMatch[1];
+      }
+    }
+
+    if (!id) {
+      const playlistLink = card.querySelector('a[href*="/playlist?list="]') as HTMLAnchorElement;
+      if (playlistLink) {
+        const href = playlistLink.getAttribute('href');
+        if (href) {
+          const listMatch = href.match(/[?&]list=([A-Za-z0-9_-]+)/);
+          if (listMatch && listMatch[1]) {
+            id = listMatch[1];
+          }
+        }
+      }
+    }
+
+    if (!id) return;
+
+    // Filter to user playlists only
+    const userPrefixes = ['PL', 'FL', 'LL', 'WL', 'OL', 'RD'];
+    if (!userPrefixes.some(prefix => id!.startsWith(prefix))) return;
+
+    if (seenIds.has(id)) return;
+    seenIds.add(id);
+
+    // Extract title
+    const titleEl = card.querySelector('h3[title]') as HTMLElement;
+    const title = titleEl?.getAttribute('title') || titleEl?.textContent || 'Unknown Playlist';
+
+    // Extract thumbnail
+    const thumbnailEl = card.querySelector('.ytThumbnailViewModelImage img') as HTMLImageElement;
+    const thumbnailUrl = thumbnailEl?.src || '';
+
+    playlists.push({
+      id,
+      title: title.trim(),
+      thumbnailUrl,
+    });
+  });
+
+  return playlists;
+}
+
+// ============================================================================
+// Folder Helpers
+// ============================================================================
+
+/**
+ * Get the count of playlists in a folder
+ */
+function getFolderPlaylistCount(folderId: string | null): number {
+  if (folderId === null) {
+    // Unassigned: playlists not in any folder
+    const assignedIds = new Set<string>();
+    for (const folder of Object.values(cachedFolders)) {
+      for (const id of folder.playlistIds) {
+        assignedIds.add(id);
+      }
+    }
+    return cachedPlaylists.filter(p => !assignedIds.has(p.id)).length;
+  }
+
+  const folder = cachedFolders[folderId];
+  if (!folder) return 0;
+
+  // Count only playlists that exist in the current page
+  const playlistIds = new Set(cachedPlaylists.map(p => p.id));
+  return folder.playlistIds.filter(id => playlistIds.has(id)).length;
+}
+
+/**
+ * Get playlists for a folder
+ */
+function getPlaylistsForFolder(folderId: string | null): PlaylistInfo[] {
+  if (folderId === null) {
+    // Unassigned: playlists not in any folder
+    const assignedIds = new Set<string>();
+    for (const folder of Object.values(cachedFolders)) {
+      for (const id of folder.playlistIds) {
+        assignedIds.add(id);
+      }
+    }
+    return cachedPlaylists.filter(p => !assignedIds.has(p.id));
+  }
+
+  const folder = cachedFolders[folderId];
+  if (!folder) return [];
+
+  const folderPlaylistIds = new Set(folder.playlistIds);
+  return cachedPlaylists.filter(p => folderPlaylistIds.has(p.id));
+}
+
+// ============================================================================
+// Sidebar Building
+// ============================================================================
+
+/**
+ * Build the folder sidebar HTML
+ */
+function buildSidebarHTML(): string {
+  const sortedFolders = Object.values(cachedFolders).sort((a, b) =>
+    a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+  );
+
+  const unassignedCount = getFolderPlaylistCount(null);
+  const unassignedActive = selectedFolderId === null ? 'active' : '';
+
+  let html = `
+    <div class="ytcatalog-sidebar-section">
+      <button class="ytcatalog-sidebar-item ${unassignedActive}" data-folder-id="__unassigned__">
+        <span class="ytcatalog-sidebar-item-name">Unassigned</span>
+        <span class="ytcatalog-sidebar-item-count">${unassignedCount}</span>
+      </button>
+    </div>
+    <div class="ytcatalog-sidebar-divider"></div>
+    <div class="ytcatalog-sidebar-section ytcatalog-sidebar-folders">
+  `;
+
+  for (const folder of sortedFolders) {
+    const count = getFolderPlaylistCount(folder.id);
+    const active = selectedFolderId === folder.id ? 'active' : '';
+    html += `
+      <div class="ytcatalog-sidebar-item-wrapper" data-folder-id="${folder.id}">
+        <button class="ytcatalog-sidebar-item ${active}" data-folder-id="${folder.id}">
+          <span class="ytcatalog-sidebar-item-name">${escapeHtml(folder.name)}</span>
+          <span class="ytcatalog-sidebar-item-count">${count}</span>
+        </button>
+        <div class="ytcatalog-sidebar-item-actions">
+          <button class="ytcatalog-sidebar-action ytcatalog-rename-folder" data-folder-id="${folder.id}" title="Rename">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18" fill="currentColor">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            </svg>
+          </button>
+          <button class="ytcatalog-sidebar-action ytcatalog-delete-folder" data-folder-id="${folder.id}" title="Delete">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18" fill="currentColor">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  html += `
+    </div>
+    <div class="ytcatalog-sidebar-footer">
+      <button class="ytcatalog-sidebar-new-folder">+ New Folder</button>
+    </div>
+  `;
+
+  return html;
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Render the sidebar
+ */
+function renderSidebar(): void {
+  if (!modalElement) return;
+
+  const sidebar = modalElement.querySelector('.ytcatalog-modal-sidebar');
+  if (!sidebar) return;
+
+  sidebar.innerHTML = buildSidebarHTML();
+  attachSidebarEventListeners();
+}
+
+/**
+ * Attach event listeners to sidebar elements
+ */
+function attachSidebarEventListeners(): void {
+  if (!modalElement) return;
+
+  const sidebar = modalElement.querySelector('.ytcatalog-modal-sidebar');
+  if (!sidebar) return;
+
+  // Folder selection
+  sidebar.querySelectorAll('.ytcatalog-sidebar-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const folderId = (item as HTMLElement).dataset.folderId;
+      if (folderId === '__unassigned__') {
+        selectedFolderId = null;
+      } else if (folderId) {
+        selectedFolderId = folderId;
+      }
+      renderSidebar();
+      renderContent();
+    });
+  });
+
+  // New folder button
+  const newFolderBtn = sidebar.querySelector('.ytcatalog-sidebar-new-folder');
+  if (newFolderBtn) {
+    newFolderBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await handleNewFolderInModal();
+    });
+  }
+
+  // Rename buttons
+  sidebar.querySelectorAll('.ytcatalog-rename-folder').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const folderId = (btn as HTMLElement).dataset.folderId;
+      if (folderId) {
+        await handleRenameFolderInModal(folderId);
+      }
+    });
+  });
+
+  // Delete buttons
+  sidebar.querySelectorAll('.ytcatalog-delete-folder').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const folderId = (btn as HTMLElement).dataset.folderId;
+      if (folderId) {
+        await handleDeleteFolderInModal(folderId);
+      }
+    });
+  });
+}
+
+/**
+ * Handle new folder creation in modal
+ */
+async function handleNewFolderInModal(): Promise<void> {
+  const name = prompt('Enter folder name:');
+  if (name === null) return;
+
+  const result = await folderStorage.createFolder(name);
+
+  if (!result.success) {
+    if (result.error === 'empty_name') {
+      alert('Folder name cannot be empty');
+    } else if (result.error === 'duplicate_name') {
+      alert('A folder with this name already exists');
+    }
+    return;
+  }
+
+  // Refresh folders and re-render
+  cachedFolders = await folderStorage.getFolders();
+  selectedFolderId = result.folder.id;
+  renderSidebar();
+  renderContent();
+}
+
+/**
+ * Handle folder rename in modal (Phase 5e placeholder)
+ */
+async function handleRenameFolderInModal(folderId: string): Promise<void> {
+  const folder = cachedFolders[folderId];
+  if (!folder) return;
+
+  const newName = prompt('Enter new folder name:', folder.name);
+  if (newName === null || newName.trim() === folder.name) return;
+
+  const trimmedName = newName.trim();
+  if (!trimmedName) {
+    alert('Folder name cannot be empty');
+    return;
+  }
+
+  // Check for duplicate
+  const exists = await folderStorage.folderNameExists(trimmedName);
+  if (exists && trimmedName.toLowerCase() !== folder.name.toLowerCase()) {
+    alert('A folder with this name already exists');
+    return;
+  }
+
+  await folderStorage.renameFolder(folderId, trimmedName);
+  cachedFolders = await folderStorage.getFolders();
+  renderSidebar();
+}
+
+/**
+ * Handle folder delete in modal (Phase 5f placeholder)
+ */
+async function handleDeleteFolderInModal(folderId: string): Promise<void> {
+  const folder = cachedFolders[folderId];
+  if (!folder) return;
+
+  const confirmed = confirm(`Delete folder "${folder.name}"?\n\nPlaylists in this folder will become unassigned.`);
+  if (!confirmed) return;
+
+  await folderStorage.deleteFolder(folderId);
+  cachedFolders = await folderStorage.getFolders();
+
+  // If deleted folder was selected, switch to Unassigned
+  if (selectedFolderId === folderId) {
+    selectedFolderId = null;
+  }
+
+  renderSidebar();
+  renderContent();
+}
+
+// ============================================================================
+// Content Area (Phase 5c placeholder)
+// ============================================================================
+
+/**
+ * Render the content area (playlist grid)
+ */
+function renderContent(): void {
+  if (!modalElement) return;
+
+  const content = modalElement.querySelector('.ytcatalog-modal-content');
+  if (!content) return;
+
+  const playlists = getPlaylistsForFolder(selectedFolderId);
+  const folderName = selectedFolderId === null
+    ? 'Unassigned'
+    : (cachedFolders[selectedFolderId]?.name || 'Unknown');
+
+  if (playlists.length === 0) {
+    content.innerHTML = `
+      <div class="ytcatalog-content-empty">
+        <p>No playlists in "${escapeHtml(folderName)}"</p>
+      </div>
+    `;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="ytcatalog-content-header">
+      <h3>${escapeHtml(folderName)} (${playlists.length})</h3>
+    </div>
+    <div class="ytcatalog-content-placeholder">
+      <p style="color: #aaa;">Playlist grid coming in Phase 5c</p>
+      <p style="color: #666; font-size: 12px;">${playlists.length} playlists to display</p>
+    </div>
+  `;
+}
 
 /**
  * Create the modal DOM structure
@@ -65,7 +445,7 @@ function createModalElement(): HTMLElement {
 /**
  * Open the organization modal
  */
-export function openModal(): void {
+export async function openModal(): Promise<void> {
   if (isModalOpen) return;
 
   // Create modal if it doesn't exist
@@ -75,9 +455,18 @@ export function openModal(): void {
     attachModalEventListeners();
   }
 
+  // Load data for the modal
+  cachedFolders = await folderStorage.getFolders();
+  cachedPlaylists = scrapePlaylistsForModal();
+  selectedFolderId = null; // Start with Unassigned selected
+
   // Show modal
   modalElement.classList.add('open');
   isModalOpen = true;
+
+  // Render sidebar and content
+  renderSidebar();
+  renderContent();
 
   // Prevent body scroll while modal is open
   document.body.style.overflow = 'hidden';
@@ -94,6 +483,9 @@ export function closeModal(): void {
 
   // Restore body scroll
   document.body.style.overflow = '';
+
+  // Notify that folders may have changed
+  document.dispatchEvent(new CustomEvent('ytcatalog-folders-changed'));
 }
 
 /**
