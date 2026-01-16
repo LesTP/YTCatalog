@@ -22,7 +22,8 @@ interface PlaylistInfo {
 
 let modalElement: HTMLElement | null = null;
 let isModalOpen = false;
-let selectedFolderId: string | null = null; // null = Unassigned
+let selectedFolderId: string | null = null; // null = Unassigned (folder being viewed)
+let selectedPlaylistId: string | null = null; // Playlist selected for assignment
 let cachedFolders: Record<string, Folder> = {};
 let cachedPlaylists: PlaylistInfo[] = [];
 
@@ -226,6 +227,34 @@ function renderSidebar(): void {
 }
 
 /**
+ * Get the current folder ID for a playlist
+ */
+function getCurrentFolderForPlaylist(playlistId: string): string | null {
+  for (const folder of Object.values(cachedFolders)) {
+    if (folder.playlistIds.includes(playlistId)) {
+      return folder.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Assign a playlist to a folder (or unassign if folderId is null)
+ */
+async function assignPlaylistToFolder(playlistId: string, targetFolderId: string | null): Promise<void> {
+  if (targetFolderId === null) {
+    // Remove from any folder (unassign)
+    await folderStorage.removePlaylistFromFolder(playlistId);
+  } else {
+    // Add to target folder (removes from previous folder automatically)
+    await folderStorage.addPlaylistToFolder(targetFolderId, playlistId);
+  }
+
+  // Refresh cached folders
+  cachedFolders = await folderStorage.getFolders();
+}
+
+/**
  * Attach event listeners to sidebar elements
  */
 function attachSidebarEventListeners(): void {
@@ -234,11 +263,37 @@ function attachSidebarEventListeners(): void {
   const sidebar = modalElement.querySelector('.ytcatalog-modal-sidebar');
   if (!sidebar) return;
 
-  // Folder selection
+  // Folder selection / assignment
   sidebar.querySelectorAll('.ytcatalog-sidebar-item').forEach(item => {
-    item.addEventListener('click', (e) => {
+    item.addEventListener('click', async (e) => {
       e.stopPropagation();
       const folderId = (item as HTMLElement).dataset.folderId;
+      const targetFolderId = folderId === '__unassigned__' ? null : folderId;
+
+      // If a playlist is selected, handle assignment
+      if (selectedPlaylistId) {
+        const currentFolder = getCurrentFolderForPlaylist(selectedPlaylistId);
+
+        // If clicking the same folder the playlist is in, just deselect
+        if (currentFolder === targetFolderId) {
+          selectedPlaylistId = null;
+          updatePlaylistSelectionUI();
+          return;
+        }
+
+        // Assign to the clicked folder
+        await assignPlaylistToFolder(selectedPlaylistId, targetFolderId ?? null);
+
+        // Clear selection
+        selectedPlaylistId = null;
+
+        // Refresh UI
+        renderSidebar();
+        renderContent();
+        return;
+      }
+
+      // No playlist selected - just navigate to folder
       if (folderId === '__unassigned__') {
         selectedFolderId = null;
       } else if (folderId) {
@@ -357,15 +412,18 @@ async function handleDeleteFolderInModal(folderId: string): Promise<void> {
 }
 
 // ============================================================================
-// Content Area (Phase 5c - Playlist Grid)
+// Content Area (Phase 5c/5d - Playlist Grid with Click-to-Assign)
 // ============================================================================
 
 /**
  * Build the HTML for a single playlist card
  */
 function buildPlaylistCardHTML(playlist: PlaylistInfo): string {
+  const isSelected = selectedPlaylistId === playlist.id;
+  const selectedClass = isSelected ? 'selected' : '';
+
   return `
-    <div class="ytcatalog-playlist-card" data-playlist-id="${playlist.id}">
+    <div class="ytcatalog-playlist-card ${selectedClass}" data-playlist-id="${playlist.id}">
       <div class="ytcatalog-playlist-thumbnail">
         ${playlist.thumbnailUrl
           ? `<img src="${playlist.thumbnailUrl}" alt="${escapeHtml(playlist.title)}" loading="lazy" />`
@@ -412,6 +470,52 @@ function renderContent(): void {
       ${playlistCardsHTML}
     </div>
   `;
+
+  // Attach click handlers to playlist cards
+  attachPlaylistCardEventListeners();
+}
+
+/**
+ * Attach click handlers to playlist cards for selection
+ */
+function attachPlaylistCardEventListeners(): void {
+  if (!modalElement) return;
+
+  const cards = modalElement.querySelectorAll('.ytcatalog-playlist-card');
+  cards.forEach(card => {
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const playlistId = (card as HTMLElement).dataset.playlistId;
+      if (!playlistId) return;
+
+      // Toggle selection: if already selected, deselect; otherwise select
+      if (selectedPlaylistId === playlistId) {
+        selectedPlaylistId = null;
+      } else {
+        selectedPlaylistId = playlistId;
+      }
+
+      // Update visual state
+      updatePlaylistSelectionUI();
+    });
+  });
+}
+
+/**
+ * Update the visual selection state of playlist cards
+ */
+function updatePlaylistSelectionUI(): void {
+  if (!modalElement) return;
+
+  const cards = modalElement.querySelectorAll('.ytcatalog-playlist-card');
+  cards.forEach(card => {
+    const playlistId = (card as HTMLElement).dataset.playlistId;
+    if (playlistId === selectedPlaylistId) {
+      card.classList.add('selected');
+    } else {
+      card.classList.remove('selected');
+    }
+  });
 }
 
 /**
@@ -429,7 +533,10 @@ function createModalElement(): HTMLElement {
   const header = document.createElement('div');
   header.className = 'ytcatalog-modal-header';
   header.innerHTML = `
-    <h2 class="ytcatalog-modal-title">Organize Playlists</h2>
+    <div class="ytcatalog-modal-header-text">
+      <h2 class="ytcatalog-modal-title">Organize Playlists</h2>
+      <p class="ytcatalog-modal-subtitle">Click a playlist, then click a folder to move it</p>
+    </div>
     <button class="ytcatalog-modal-close" aria-label="Close modal">
       <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" fill="currentColor">
         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>

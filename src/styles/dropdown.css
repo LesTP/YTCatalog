@@ -65,6 +65,17 @@
   color: #3ea6ff !important;
 }
 
+/* Playlist count in dropdown */
+.ytcatalog-dropdown-count {
+  font-size: 12px !important;
+  color: #717171 !important;
+  margin-left: 8px !important;
+}
+
+.ytcatalog-dropdown-item:hover .ytcatalog-dropdown-count {
+  color: #aaa !important;
+}
+
 /* Separator */
 .ytcatalog-dropdown-separator {
   height: 1px !important;

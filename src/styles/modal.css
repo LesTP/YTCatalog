@@ -54,10 +54,23 @@
   flex-shrink: 0;
 }
 
+.ytcatalog-modal-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .ytcatalog-modal-title {
   font-size: 20px;
   font-weight: 500;
   color: #fff;
+  margin: 0;
+  font-family: 'Roboto', 'Arial', sans-serif;
+}
+
+.ytcatalog-modal-subtitle {
+  font-size: 13px;
+  color: #aaa;
   margin: 0;
   font-family: 'Roboto', 'Arial', sans-serif;
 }
@@ -284,12 +297,25 @@
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+  border: 2px solid transparent;
 }
 
 .ytcatalog-playlist-card:hover {
   background-color: #272727;
   transform: scale(1.02);
+}
+
+/* Selected state */
+.ytcatalog-playlist-card.selected {
+  border-color: #3ea6ff;
+  background-color: #1a3a52;
+  transform: scale(1.02);
+  box-shadow: 0 0 0 2px rgba(62, 166, 255, 0.3);
+}
+
+.ytcatalog-playlist-card.selected:hover {
+  background-color: #1f4a6a;
 }
 
 /* Thumbnail */

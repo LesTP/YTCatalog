@@ -375,6 +375,83 @@ Each entry follows this structure:
 
 ---
 
+### [2026-01-15] Phase 5b-5d: Modal Features
+
+#### What was done
+- Phase 5b: Folder sidebar with counts, selection, rename/delete icons on hover
+- Phase 5c: Playlist grid with thumbnails and titles
+- Phase 5d: Click-to-assign workflow (select playlist → click folder → assign)
+- Added static tip in modal header: "Click a playlist, then click a folder to move it"
+- Added playlist counts to dropdown menu items
+- Added custom event sync between modal and dropdown (`ytcatalog-folders-changed`)
+
+#### Issues encountered
+- Dropdown counts showed zeros on first open
+  - Fixed by calling `refreshDropdownMenu()` after playlists are cached
+- Clicking on count span inside dropdown item didn't trigger action
+  - Fixed by using `closest('.ytcatalog-dropdown-item')` in click handler
+
+#### Files changed
+- Modified: `src/content/modal.ts` (sidebar, grid, click-to-assign)
+- Modified: `src/styles/modal.css` (sidebar, grid, selection styles)
+- Modified: `src/content/youtube.ts` (dropdown counts, event sync)
+- Modified: `src/styles/dropdown.css` (count styling)
+
+---
+
+### [2026-01-16] Bug Investigation: Stale Cache / Element Recycling
+
+#### Problem observed
+1. After using YouTube's sort button (Recently added/Alphabetically), our folder filter shows wrong playlists
+2. After using YouTube's native filters (Playlists, Music, Owned/Saved), our counts change incorrectly
+
+#### Investigation process
+Hypothesis 1: YouTube replaces DOM elements when sorting
+- Test: Saved element reference, sorted, checked `document.contains(element)`
+- Result: `true` - element still in DOM
+- Conclusion: YouTube is NOT replacing elements
+
+Hypothesis 2: YouTube recycles DOM elements (same node, different content)
+- Test: Saved element reference, captured playlist ID from class, sorted, re-read ID
+- Result:
+  - Before sort: `PLLmXZMqb_9sbNLM83NrM005vRQHw1yTKn`
+  - After sort: `PLA_L1fYcgtfKt3-kn6yatPOSIP7feeYdV`
+- Conclusion: **CONFIRMED** - YouTube reuses DOM nodes for different playlists
+
+#### Root cause
+YouTube recycles `<ytd-rich-item-renderer>` DOM elements when sorting/filtering. The same DOM node is reused to display a completely different playlist. Our cached `element→ID` mappings become invalid.
+
+**Why filtering breaks:**
+1. We cache: `{ id: "PLLmXZMqb...", element: <node> }`
+2. YouTube sorts → `<node>` now displays playlist `PLA_L1fYcgtfKt...`
+3. We try to hide `<node>` thinking it's `PLLmXZMqb...`
+4. But we're actually hiding `PLA_L1fYcgtfKt...` (wrong playlist!)
+
+#### Solution implemented
+MutationObserver with debouncing:
+1. Watch playlist container for DOM changes (`childList`, `attributes` on `class`)
+2. Debounce (400ms) for YouTube to finish mutations
+3. Skip if we're in scroll-to-load (our own mutations via `isScrollingToLoad` flag)
+4. Clear playlist cache
+5. Re-scrape playlists (fast, no scroll - just read current DOM)
+6. Re-apply current folder filter
+7. Update dropdown counts
+
+#### Files changed
+- Modified: `src/content/youtube.ts`
+  - Added `MutationObserver` watching `#contents` for DOM changes
+  - Added `handlePlaylistMutations()` with 400ms debounce
+  - Added `startPlaylistObserver()` and `stopPlaylistObserver()`
+  - Added `isScrollingToLoad` flag to prevent re-scrape during our own scroll
+  - Updated `loadAndScrapeAllPlaylists()` to set/clear flag
+  - Updated `initializeFilterOnLoad()` to start observer
+  - Updated `init()` to stop observer when leaving playlists page
+
+#### Status
+✅ FIXED - All tests passed 2026-01-16
+
+---
+
 ## Issue Tracker
 
 | ID | Status | Description | Resolution |

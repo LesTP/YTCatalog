@@ -41,6 +41,115 @@ function clearPlaylistCache(): void {
 }
 
 // ============================================================================
+// MutationObserver: Detect YouTube DOM recycling and re-scrape
+// ============================================================================
+
+// Observer instance (to disconnect on navigation)
+let playlistObserver: MutationObserver | null = null;
+
+// Debounce timer for mutation handling
+let mutationDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Debounce delay in ms (wait for YouTube to finish mutating)
+const MUTATION_DEBOUNCE_MS = 400;
+
+// Flag to prevent re-scrape during our own scroll-to-load
+let isScrollingToLoad = false;
+
+/**
+ * Handle mutations in the playlist container.
+ * Debounces to wait for YouTube to finish recycling elements,
+ * then re-scrapes playlists and re-applies the current filter.
+ */
+async function handlePlaylistMutations(): Promise<void> {
+  // Clear any pending debounce
+  if (mutationDebounceTimer) {
+    clearTimeout(mutationDebounceTimer);
+  }
+
+  // Debounce: wait for mutations to settle
+  mutationDebounceTimer = setTimeout(async () => {
+    // Skip if we're in the middle of scroll-to-load (we triggered these mutations)
+    if (isScrollingToLoad) {
+      return;
+    }
+
+    // Clear the stale cache
+    clearPlaylistCache();
+
+    // Re-scrape playlists (fast, no scroll - just read current DOM)
+    cachedPlaylists = scrapeAllPlaylists();
+
+    // Get current filter selection
+    const selectedId = await folderStorage.getSelectedFolderId();
+    const folderId = selectedId || FOLDER_ID_ALL;
+
+    // Re-apply the filter with fresh element references
+    await applyFolderFilter(folderId);
+
+    // Update dropdown counts
+    await refreshDropdownMenu();
+  }, MUTATION_DEBOUNCE_MS);
+}
+
+/**
+ * Start observing the playlist container for DOM changes.
+ * YouTube recycles DOM elements when sorting/filtering, so we need to
+ * detect these changes and re-scrape to get fresh element→ID mappings.
+ */
+function startPlaylistObserver(): void {
+  // Disconnect any existing observer
+  stopPlaylistObserver();
+
+  // Find the playlist container
+  const gridContainer = document.querySelector(SELECTORS.playlistsGridContainer);
+  if (!gridContainer) {
+    return;
+  }
+
+  const scrollContainer = gridContainer.querySelector(SELECTORS.scrollContainerInsideGrid);
+  if (!scrollContainer) {
+    return;
+  }
+
+  // Create observer
+  playlistObserver = new MutationObserver((mutations) => {
+    // Only care about childList changes (elements added/removed/reordered)
+    // or attribute changes on playlist cards (could indicate recycling)
+    const hasRelevantMutation = mutations.some(
+      (m) => m.type === 'childList' || m.type === 'attributes'
+    );
+
+    if (hasRelevantMutation) {
+      handlePlaylistMutations();
+    }
+  });
+
+  // Start observing
+  playlistObserver.observe(scrollContainer, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class'], // Watch for class changes (content-id-* changes)
+  });
+}
+
+/**
+ * Stop observing the playlist container.
+ */
+function stopPlaylistObserver(): void {
+  if (playlistObserver) {
+    playlistObserver.disconnect();
+    playlistObserver = null;
+  }
+
+  if (mutationDebounceTimer) {
+    clearTimeout(mutationDebounceTimer);
+    mutationDebounceTimer = null;
+  }
+}
+
+// ============================================================================
 // Phase 4b: Storage-based Folder Lookup
 // ============================================================================
 
@@ -106,6 +215,9 @@ async function applyFolderFilter(folderId: string): Promise<void> {
 
     playlist.element.style.display = show ? '' : 'none';
   }
+
+  // Trigger resize to help YouTube recalculate grid layout
+  window.dispatchEvent(new Event('resize'));
 }
 
 // ============================================================================
@@ -344,11 +456,21 @@ function scrapeAllPlaylists(): ScrapedPlaylist[] {
  * @returns Promise that resolves with all scraped playlists
  */
 async function loadAndScrapeAllPlaylists(): Promise<ScrapedPlaylist[]> {
-  // First, scroll to load all playlists
-  await scrollToLoadAllPlaylists();
+  // Set flag to prevent mutation observer from re-scraping during our scroll
+  isScrollingToLoad = true;
 
-  // Then scrape them
-  return scrapeAllPlaylists();
+  try {
+    // First, scroll to load all playlists
+    await scrollToLoadAllPlaylists();
+
+    // Then scrape them
+    return scrapeAllPlaylists();
+  } finally {
+    // Clear the flag (with a small delay to let any pending mutations settle)
+    setTimeout(() => {
+      isScrollingToLoad = false;
+    }, 100);
+  }
 }
 
 // Track if we've already injected the dropdown
@@ -387,6 +509,35 @@ function getFolderLabel(folderId: string | null, folders: Record<string, Folder>
 }
 
 /**
+ * Get the count of playlists in a folder for the dropdown
+ */
+function getDropdownFolderCount(folderId: string, folders: Record<string, Folder>): number {
+  if (!cachedPlaylists) return 0;
+
+  if (folderId === FOLDER_ID_ALL) {
+    return cachedPlaylists.length;
+  }
+
+  if (folderId === FOLDER_ID_UNASSIGNED) {
+    // Unassigned: playlists not in any folder
+    const assignedIds = new Set<string>();
+    for (const folder of Object.values(folders)) {
+      for (const id of folder.playlistIds) {
+        assignedIds.add(id);
+      }
+    }
+    return cachedPlaylists.filter(p => !assignedIds.has(p.id)).length;
+  }
+
+  // Specific folder: count playlists that exist in both the folder and the current page
+  const folder = folders[folderId];
+  if (!folder) return 0;
+
+  const playlistIds = new Set(cachedPlaylists.map(p => p.id));
+  return folder.playlistIds.filter(id => playlistIds.has(id)).length;
+}
+
+/**
  * Build the dropdown menu HTML from folders
  */
 function buildMenuItems(folders: Record<string, Folder>, selectedId: string | null): string {
@@ -400,11 +551,13 @@ function buildMenuItems(folders: Record<string, Folder>, selectedId: string | nu
 
   // "All Playlists" option
   const allActive = !selectedId || selectedId === FOLDER_ID_ALL ? 'active' : '';
-  html += `<button class="ytcatalog-dropdown-item ${allActive}" data-folder="${FOLDER_ID_ALL}">All Playlists</button>`;
+  const allCount = getDropdownFolderCount(FOLDER_ID_ALL, folders);
+  html += `<button class="ytcatalog-dropdown-item ${allActive}" data-folder="${FOLDER_ID_ALL}">All Playlists <span class="ytcatalog-dropdown-count">${allCount}</span></button>`;
 
   // "Unassigned" option
   const unassignedActive = selectedId === FOLDER_ID_UNASSIGNED ? 'active' : '';
-  html += `<button class="ytcatalog-dropdown-item ${unassignedActive}" data-folder="${FOLDER_ID_UNASSIGNED}">Unassigned</button>`;
+  const unassignedCount = getDropdownFolderCount(FOLDER_ID_UNASSIGNED, folders);
+  html += `<button class="ytcatalog-dropdown-item ${unassignedActive}" data-folder="${FOLDER_ID_UNASSIGNED}">Unassigned <span class="ytcatalog-dropdown-count">${unassignedCount}</span></button>`;
 
   // User folders (from storage)
   if (sortedFolders.length > 0) {
@@ -412,7 +565,8 @@ function buildMenuItems(folders: Record<string, Folder>, selectedId: string | nu
 
     for (const folder of sortedFolders) {
       const active = selectedId === folder.id ? 'active' : '';
-      html += `<button class="ytcatalog-dropdown-item ${active}" data-folder="${folder.id}">${escapeHtml(folder.name)}</button>`;
+      const count = getDropdownFolderCount(folder.id, folders);
+      html += `<button class="ytcatalog-dropdown-item ${active}" data-folder="${folder.id}">${escapeHtml(folder.name)} <span class="ytcatalog-dropdown-count">${count}</span></button>`;
     }
   }
 
@@ -580,32 +734,34 @@ async function createDropdown(): Promise<HTMLElement> {
     e.stopPropagation();
     const target = e.target as HTMLElement;
 
-    if (!target.classList.contains('ytcatalog-dropdown-item')) {
+    // Find the actual button element (in case user clicked on the count span)
+    const button = target.closest('.ytcatalog-dropdown-item') as HTMLElement;
+    if (!button) {
       return;
     }
 
     // Handle "New Folder" action
-    if (target.dataset.action === 'new-folder') {
+    if (button.dataset.action === 'new-folder') {
       dropdown.classList.remove('open');
       await handleNewFolder();
       return;
     }
 
     // Handle "Organize..." action
-    if (target.dataset.action === 'organize') {
+    if (button.dataset.action === 'organize') {
       dropdown.classList.remove('open');
       openModal();
       return;
     }
 
     // Handle folder selection
-    const folderId = target.dataset.folder;
+    const folderId = button.dataset.folder;
     if (folderId) {
       // Update active state in menu
       menu.querySelectorAll('.ytcatalog-dropdown-item').forEach((item) => {
         item.classList.remove('active');
       });
-      target.classList.add('active');
+      button.classList.add('active');
 
       dropdown.classList.remove('open');
       await handleFolderSelect(folderId);
@@ -666,6 +822,10 @@ async function init(): Promise<void> {
         await initializeFilterOnLoad();
       }
     }, 500);
+  } else {
+    // Not on playlists page - stop observer and clear cache
+    stopPlaylistObserver();
+    clearPlaylistCache();
   }
 }
 
@@ -677,6 +837,12 @@ async function initializeFilterOnLoad(): Promise<void> {
   const selectedId = await folderStorage.getSelectedFolderId();
   const folderId = selectedId || FOLDER_ID_ALL;
   await applyFolderFilter(folderId);
+
+  // Refresh dropdown menu to show correct counts (now that playlists are cached)
+  await refreshDropdownMenu();
+
+  // Start observing for YouTube's DOM recycling (sort/filter changes)
+  startPlaylistObserver();
 }
 
 function observeNavigation(): void {

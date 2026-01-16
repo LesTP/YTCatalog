@@ -294,22 +294,52 @@ YTCatalog/
 
 **Scope**: Assign playlists to folders via click workflow.
 
+**Design Decisions**:
+- Single-select only (one playlist at a time); bulk operations deferred to Phase 6
+- Selected state: blue border + slight scale (YouTube-like style)
+- After assignment: playlist disappears from current view (moved to different folder)
+- Clicking "Unassigned" removes playlist from any folder
+- Clicking same folder playlist is already in: deselects playlist (no-op)
+- Clicking another playlist replaces selection
+
 **Tasks**:
 - [ ] Click playlist card to select it (visual highlight)
 - [ ] Click folder in sidebar to move selected playlist to that folder
 - [ ] Apply change immediately to storage
 - [ ] Update counts in sidebar after assignment
 - [ ] Refresh grid to reflect change
-- [ ] Visual feedback (brief highlight or animation)
+- [ ] Clear selection after assignment
 - [ ] Handle assigning to "Unassigned" (remove from current folder)
+- [ ] Handle clicking same folder (deselect, no-op)
 
-**Testing**:
-- [ ] Click playlist → playlist highlighted
-- [ ] Click folder → playlist moves to folder
-- [ ] Sidebar counts update correctly
-- [ ] Playlist disappears from current view (moved to different folder)
-- [ ] Storage updated immediately (verify via DevTools)
-- [ ] Dropdown filtering still works after assignment
+**Testing - Selection**:
+- [ ] Click playlist card → card shows selected state (blue border)
+- [ ] Click same playlist again → deselects it (border removed)
+- [ ] Click different playlist → new one selected, previous deselected
+- [ ] Only one playlist can be selected at a time
+
+**Testing - Assignment**:
+- [ ] Select playlist in Unassigned → click Music folder → playlist moves to Music
+- [ ] Sidebar counts update (Unassigned decreases, Music increases)
+- [ ] Playlist disappears from Unassigned grid
+- [ ] Switch to Music folder → assigned playlist appears there
+- [ ] Selection is cleared after assignment
+
+**Testing - Unassign**:
+- [ ] Select playlist in Music folder → click Unassigned → playlist removed from Music
+- [ ] Sidebar counts update (Music decreases, Unassigned increases)
+- [ ] Playlist disappears from Music grid
+- [ ] Switch to Unassigned → playlist appears there
+
+**Testing - Edge Cases**:
+- [ ] Click folder that playlist is already in → deselects playlist (no-op)
+- [ ] No playlist selected → clicking folder does nothing
+- [ ] Close modal → selection state is reset on next open
+
+**Testing - Storage Verification**:
+- [ ] Assignment persists after closing and reopening modal
+- [ ] Assignment persists after page reload
+- [ ] Dropdown filtering reflects updated assignments
 
 #### Phase 5e: Folder Rename
 
@@ -410,20 +440,31 @@ ytd-rich-item-renderer[lockup="true"]
 
 ### Future Plans (Post-MVP)
 
+#### Completed (was Phase 6)
+- [x] **Stale cache due to YouTube element recycling** ✅ Fixed 2026-01-16
+  - **Problem**: YouTube recycles DOM elements when sorting/filtering - the same `<ytd-rich-item-renderer>` node is reused to display different playlists. Our cached `element→ID` mappings became invalid.
+  - **Solution**: MutationObserver with 400ms debouncing - watches playlist container for DOM changes, clears cache, re-scrapes playlists, re-applies current filter, updates counts.
+
 #### Phase 6 Candidates
-- [ ] **Thumbnail loading for off-screen playlists**: YouTube lazy-loads images; off-screen playlist thumbnails don't load. Consider placeholder images, title-only cards, or alternative scraping approach
-- [ ] **Bulk operations**: Multi-select playlists + bulk move to folder
-- [ ] **Drag-and-drop**: Add drag-and-drop as alternative to click-to-assign
-- [ ] **Save/Cancel workflow**: Add undo capability or Save/Cancel for modal changes
+
+**Top Priority:**
+- [ ] **Grid layout gaps when filtering**: YouTube's layout doesn't reflow properly when we hide playlists with `display: none`. Resize event doesn't help. May need to explore alternative approaches (CSS order, DOM manipulation, or accept as limitation)
 - [ ] **Firefox support**: Use webextension-polyfill or conditional API code (`chrome.storage` → `browser.storage`)
 - [ ] **Export/Import folders**: Download folders as JSON, import from JSON file (alternative to cloud sync)
+- [ ] **Thumbnail loading for off-screen playlists**: YouTube lazy-loads images; off-screen playlist thumbnails don't load. Consider placeholder images, title-only cards, or alternative scraping approach
+
+**Medium Priority:**
+- [ ] **Bulk operations**: Multi-select playlists + bulk move to folder
+- [ ] **Drag-and-drop**: Add drag-and-drop as alternative to click-to-assign
+
+**Nice to Have:**
+- [ ] **Save/Cancel workflow**: Add undo capability or Save/Cancel for modal changes
 - [ ] **Remove/hide test hotkey**: Remove `Ctrl+Shift+Y` testing feature or hide behind debug flag
 
 #### Later
 - Cloud sync functionality
 - Folder nesting/hierarchy
 - Playlist search within folders
-- Import/export folder structure
 - Keyboard shortcuts
 
 ---
