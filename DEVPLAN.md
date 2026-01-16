@@ -156,7 +156,7 @@ YTCatalog/
 - [x] Empty folder name shows error alert
 - [x] Clicking cancel on prompt does nothing
 
-### Phase 4: Filtering Logic ← CURRENT
+### Phase 4: Filtering Logic ✓
 
 **Goal**: Filter playlist view based on selected folder; compute "unassigned" dynamically.
 
@@ -223,7 +223,7 @@ YTCatalog/
 
 **Note**: Deleted folders are recreated on next page load by `seedTestFolders()` - this is expected temporary behavior for Phase 4b testing. Will be removed in Phase 5.
 
-### Phase 5: Organization Modal ← CURRENT
+### Phase 5: Organization Modal ✓
 
 **Goal**: Full-screen modal for managing playlists and folders with click-to-assign workflow.
 
@@ -233,64 +233,64 @@ YTCatalog/
 - Hover to reveal edit/delete icons on folder rows (D-18)
 - Changes apply immediately, no Save/Cancel workflow (D-19)
 
-#### Phase 5a: Modal Structure & Open/Close
+#### Phase 5a: Modal Structure & Open/Close ✓
 
 **Scope**: Basic modal shell that opens and closes.
 
 **Tasks**:
-- [ ] Add "Organize..." menu item to dropdown (after "+ New Folder", with separator)
-- [ ] Create `src/content/modal.ts` for modal logic
-- [ ] Create `src/styles/modal.css` for modal styling
-- [ ] Create modal shell: full-screen overlay, container, header with title + close button
-- [ ] Wire "Organize..." click to open modal
-- [ ] Close modal: X button, Escape key, click outside overlay
-- [ ] Update webpack config if needed for new files
+- [x] Add "Organize..." menu item to dropdown (after "+ New Folder", with separator)
+- [x] Create `src/content/modal.ts` for modal logic
+- [x] Create `src/styles/modal.css` for modal styling
+- [x] Create modal shell: full-screen overlay, container, header with title + close button
+- [x] Wire "Organize..." click to open modal
+- [x] Close modal: X button, Escape key, click outside overlay
+- [x] Update webpack config if needed for new files
 
 **Testing**:
-- [ ] Click "Organize..." in dropdown → modal opens
-- [ ] Click X button → modal closes
-- [ ] Press Escape → modal closes
-- [ ] Click outside modal container → modal closes
-- [ ] Modal has header "Organize Playlists" with close button
+- [x] Click "Organize..." in dropdown → modal opens
+- [x] Click X button → modal closes
+- [x] Press Escape → modal closes
+- [x] Click outside modal container → modal closes
+- [x] Modal has header "Organize Playlists" with close button
 
-#### Phase 5b: Folder Sidebar
+#### Phase 5b: Folder Sidebar ✓
 
 **Scope**: Left sidebar showing folders with counts.
 
 **Tasks**:
-- [ ] Add left sidebar (250px fixed width)
-- [ ] Show "Unassigned" at top with computed count
-- [ ] List user folders with playlist counts
-- [ ] Clicking folder selects/highlights it
-- [ ] "+ New Folder" button at bottom (reuse existing validation logic)
-- [ ] Style to match YouTube aesthetic
+- [x] Add left sidebar (250px fixed width)
+- [x] Show "Unassigned" at top with computed count
+- [x] List user folders with playlist counts
+- [x] Clicking folder selects/highlights it
+- [x] "+ New Folder" button at bottom (reuse existing validation logic)
+- [x] Style to match YouTube aesthetic
 
 **Testing**:
-- [ ] Sidebar shows "Unassigned" with correct count
-- [ ] Sidebar shows user folders (Music, Art) with correct counts
-- [ ] Clicking folder highlights it
-- [ ] "+ New Folder" creates folder and adds to list
-- [ ] Folder validation works (empty name, duplicate name)
+- [x] Sidebar shows "Unassigned" with correct count
+- [x] Sidebar shows user folders (Music, Art) with correct counts
+- [x] Clicking folder highlights it
+- [x] "+ New Folder" creates folder and adds to list
+- [x] Folder validation works (empty name, duplicate name)
 
-#### Phase 5c: Playlist Grid
+#### Phase 5c: Playlist Grid ✓
 
 **Scope**: Right side showing playlists for selected folder.
 
 **Tasks**:
-- [ ] Add right content area (flex grow)
-- [ ] Show playlist cards: thumbnail + title
-- [ ] Display playlists for currently selected folder
-- [ ] Update grid when selecting different folder in sidebar
-- [ ] Handle empty state (no playlists in folder)
+- [x] Add right content area (flex grow)
+- [x] Show playlist cards: thumbnail + title
+- [x] Display playlists for currently selected folder
+- [x] Update grid when selecting different folder in sidebar
+- [x] Handle empty state (no playlists in folder)
 
 **Testing**:
-- [ ] Selecting "Unassigned" shows unassigned playlists
-- [ ] Selecting "Music" shows Music folder playlists
-- [ ] Selecting "Art" shows Art folder playlists
-- [ ] Empty folder shows appropriate message
-- [ ] Playlist cards display thumbnail and title
+- [x] Selecting "Unassigned" shows unassigned playlists
+- [x] Selecting "Music" shows Music folder playlists
+- [x] Selecting "Art" shows Art folder playlists
+- [x] Empty folder shows appropriate message
+- [x] Playlist cards display thumbnail and title
 
-#### Phase 5d: Click-to-Assign Playlists
+#### Phase 5d: Click-to-Assign Playlists ✓
 
 **Scope**: Assign playlists to folders via click workflow.
 
@@ -303,85 +303,85 @@ YTCatalog/
 - Clicking another playlist replaces selection
 
 **Tasks**:
-- [ ] Click playlist card to select it (visual highlight)
-- [ ] Click folder in sidebar to move selected playlist to that folder
-- [ ] Apply change immediately to storage
-- [ ] Update counts in sidebar after assignment
-- [ ] Refresh grid to reflect change
-- [ ] Clear selection after assignment
-- [ ] Handle assigning to "Unassigned" (remove from current folder)
-- [ ] Handle clicking same folder (deselect, no-op)
+- [x] Click playlist card to select it (visual highlight)
+- [x] Click folder in sidebar to move selected playlist to that folder
+- [x] Apply change immediately to storage
+- [x] Update counts in sidebar after assignment
+- [x] Refresh grid to reflect change
+- [x] Clear selection after assignment
+- [x] Handle assigning to "Unassigned" (remove from current folder)
+- [x] Handle clicking same folder (deselect, no-op)
 
 **Testing - Selection**:
-- [ ] Click playlist card → card shows selected state (blue border)
-- [ ] Click same playlist again → deselects it (border removed)
-- [ ] Click different playlist → new one selected, previous deselected
-- [ ] Only one playlist can be selected at a time
+- [x] Click playlist card → card shows selected state (blue border)
+- [x] Click same playlist again → deselects it (border removed)
+- [x] Click different playlist → new one selected, previous deselected
+- [x] Only one playlist can be selected at a time
 
 **Testing - Assignment**:
-- [ ] Select playlist in Unassigned → click Music folder → playlist moves to Music
-- [ ] Sidebar counts update (Unassigned decreases, Music increases)
-- [ ] Playlist disappears from Unassigned grid
-- [ ] Switch to Music folder → assigned playlist appears there
-- [ ] Selection is cleared after assignment
+- [x] Select playlist in Unassigned → click Music folder → playlist moves to Music
+- [x] Sidebar counts update (Unassigned decreases, Music increases)
+- [x] Playlist disappears from Unassigned grid
+- [x] Switch to Music folder → assigned playlist appears there
+- [x] Selection is cleared after assignment
 
 **Testing - Unassign**:
-- [ ] Select playlist in Music folder → click Unassigned → playlist removed from Music
-- [ ] Sidebar counts update (Music decreases, Unassigned increases)
-- [ ] Playlist disappears from Music grid
-- [ ] Switch to Unassigned → playlist appears there
+- [x] Select playlist in Music folder → click Unassigned → playlist removed from Music
+- [x] Sidebar counts update (Music decreases, Unassigned increases)
+- [x] Playlist disappears from Music grid
+- [x] Switch to Unassigned → playlist appears there
 
 **Testing - Edge Cases**:
-- [ ] Click folder that playlist is already in → deselects playlist (no-op)
-- [ ] No playlist selected → clicking folder does nothing
-- [ ] Close modal → selection state is reset on next open
+- [x] Click folder that playlist is already in → deselects playlist (no-op)
+- [x] No playlist selected → clicking folder does nothing
+- [x] Close modal → selection state is reset on next open
 
 **Testing - Storage Verification**:
-- [ ] Assignment persists after closing and reopening modal
-- [ ] Assignment persists after page reload
-- [ ] Dropdown filtering reflects updated assignments
+- [x] Assignment persists after closing and reopening modal
+- [x] Assignment persists after page reload
+- [x] Dropdown filtering reflects updated assignments
 
-#### Phase 5e: Folder Rename
+#### Phase 5e: Folder Rename ✓
 
 **Scope**: Rename folders via hover-reveal UI.
 
 **Tasks**:
-- [ ] Show edit icon on folder row hover
-- [ ] Click edit → prompt for new name (or inline edit)
-- [ ] Validate: non-empty, no duplicate name
-- [ ] Apply immediately to storage
-- [ ] Update sidebar display
+- [x] Show edit icon on folder row hover
+- [x] Click edit → prompt for new name (or inline edit)
+- [x] Validate: non-empty, no duplicate name
+- [x] Apply immediately to storage
+- [x] Update sidebar display
 
 **Testing**:
-- [ ] Hover folder → edit icon appears
-- [ ] Click edit → can enter new name
-- [ ] Empty name rejected with error
-- [ ] Duplicate name rejected with error
-- [ ] Valid rename updates storage and display
-- [ ] Dropdown shows renamed folder
+- [x] Hover folder → edit icon appears
+- [x] Click edit → can enter new name
+- [x] Empty name rejected with error
+- [x] Duplicate name rejected with error
+- [x] Valid rename updates storage and display
+- [x] Dropdown shows renamed folder
 
-#### Phase 5f: Folder Delete
+#### Phase 5f: Folder Delete ✓
 
 **Scope**: Delete folders via hover-reveal UI.
 
 **Tasks**:
-- [ ] Show delete icon on folder row hover
-- [ ] Click delete → confirmation dialog
-- [ ] Playlists in deleted folder become unassigned
-- [ ] If deleted folder was selected in dropdown, reset to "All Playlists"
-- [ ] Apply immediately to storage
-- [ ] Update sidebar (remove folder, update Unassigned count)
+- [x] Show delete icon on folder row hover
+- [x] Click delete → confirmation dialog
+- [x] Playlists in deleted folder become unassigned
+- [x] If deleted folder was selected in dropdown, reset to "All Playlists"
+- [x] Apply immediately to storage
+- [x] Update sidebar (remove folder, update Unassigned count)
 
 **Testing**:
-- [ ] Hover folder → delete icon appears
-- [ ] Click delete → confirmation prompt
-- [ ] Cancel → no change
-- [ ] Confirm → folder deleted
-- [ ] Playlists from deleted folder appear in Unassigned
-- [ ] Sidebar counts update correctly
-- [ ] Dropdown no longer shows deleted folder
+- [x] Hover folder → delete icon appears
+- [x] Click delete → confirmation prompt
+- [x] Cancel → no change
+- [x] Confirm → folder deleted
+- [x] Playlists from deleted folder appear in Unassigned
+- [x] Sidebar counts update correctly
+- [x] Dropdown no longer shows deleted folder
 
-### Phase 6: Polish & Testing
+### Phase 6: Polish & Testing ← CURRENT
 - [ ] Error handling
 - [ ] Edge cases
 - [ ] Cross-browser testing

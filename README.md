@@ -6,20 +6,23 @@ A browser extension for organizing YouTube playlists into folders.
 
 ## Cold Start Summary
 
-- **What this is**: YTCatalog is a browser extension to organize YouTube playlists into custom folders with filtering and drag-and-drop management
-- **Current state**: Phase 4 complete - filtering works with storage-based folder assignments
+- **What this is**: YTCatalog is a browser extension to organize YouTube playlists into custom folders with filtering and click-to-assign management
+- **Current state**: Phase 5 complete - full organization modal with playlist assignment working
 - **What works**:
   - Dropdown button on `/feed/playlists` matching YouTube's native chip design
   - Scroll-to-load triggers loading of all playlists (handles YouTube's lazy loading)
   - Scrapes 300+ playlists with IDs, titles, thumbnails, video counts
   - Filters by playlist ID prefix (PL, FL, LL, WL, OL, RD)
-  - Create folders via "+ New Folder" (validated: non-empty, no duplicates)
+  - Create, rename, delete folders (validated: non-empty, no duplicates)
   - Folders persist to Chrome storage and display alphabetically
   - Selected folder persists across page reloads
   - Filtering shows/hides playlists based on folder selection
   - "Unassigned" computed dynamically (all playlists not in any folder)
-  - Deleted folder handling (silent reset to All Playlists)
-- **What's next**: Phase 5 - Organization Modal (assign playlists to folders, rename/delete folders)
+  - Organization modal with folder sidebar and playlist grid
+  - Click-to-assign: select playlist → click folder → playlist moves
+  - MutationObserver handles YouTube's DOM recycling on sort/filter
+  - Dropdown shows playlist counts per folder
+- **What's next**: Phase 6 - Polish (grid layout gaps, Firefox support, export/import)
 - **Key architecture**: Playlist metadata read from DOM (not cached); storage only holds folder→playlistID mappings; "unassigned" computed dynamically
 - **Key constraint**: Chrome Manifest V3; dropdown uses `position: fixed` to escape YouTube's overflow clipping
 - **Tech stack**: TypeScript, Webpack, Chrome Storage API
@@ -29,9 +32,18 @@ A browser extension for organizing YouTube playlists into folders.
 
 ## TODO (Phase 6 / Post-MVP)
 
-- [ ] **Firefox support**: Use webextension-polyfill or conditional API code (`chrome.storage` → `browser.storage`)
-- [ ] **Export/Import folders**: Download folders as JSON, import from JSON file (alternative to cloud sync)
-- [ ] **Remove/hide test hotkey**: Remove `Ctrl+Shift+Y` testing feature or hide behind debug flag
+**Top Priority:**
+- [ ] **Grid layout gaps**: YouTube's CSS doesn't reflow hidden items properly
+- [ ] **Firefox support**: Use webextension-polyfill or conditional API code
+- [ ] **Export/Import folders**: Download/upload folder structure as JSON
+- [ ] **Thumbnail loading**: Off-screen playlist thumbnails don't load (YouTube lazy-loading)
+
+**Medium Priority:**
+- [ ] **Bulk operations**: Multi-select playlists + bulk move to folder
+- [ ] **Drag-and-drop**: Add as alternative to click-to-assign
+
+**Nice to Have:**
+- [ ] **Remove/hide test hotkey**: Remove `Ctrl+Shift+Y` or hide behind debug flag
 
 ---
 
