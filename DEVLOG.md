@@ -182,91 +182,6 @@ Each entry follows this structure:
 
 ---
 
-### [2026-01-14] Phase 4b: Storage-based Filtering
-
-#### What was done
-- Removed all Phase 4a hard-coded test logic:
-  - Removed `TEST_FOLDER_MUSIC` and `TEST_FOLDER_ART` constants
-  - Removed `getTestFolderIdForPlaylist()` function
-  - Removed test folder hard-coding from `buildMenuItems()` and `getFolderLabel()`
-- Added storage-based folder lookup:
-  - Added `getFolderIdForPlaylist(playlistId, folders)` - looks up playlist in folder's `playlistIds` array
-  - Added `seedTestFolders()` - creates Music/Art folders with SWAPPED assignments (OL→Art, RD→Music)
-- Modified `applyFolderFilter()`:
-  - Loads folders from storage
-  - Uses `getFolderIdForPlaylist()` for lookup
-  - Handles deleted folder edge case: silent reset to All Playlists + dropdown refresh
-- Modified `initializeFilterOnLoad()` to call `seedTestFolders()` and `refreshDropdownMenu()`
-
-#### Issues encountered
-1. **Wrong playlists shown after seeding**: Initially, playlists shown didn't match RD/OL prefixes
-   - Cause: User had old Music/Art folders from Phase 3 with stale data
-   - Fix: Added extensive debug logging to verify seeding; clearing storage resolved issue
-
-2. **Deleted folder remained in dropdown**: After deleting folder via DevTools, it still appeared in dropdown
-   - Cause: `applyFolderFilter()` updated label but didn't refresh menu
-   - Fix: Added `await refreshDropdownMenu()` after detecting deleted folder
-
-3. **Deleted folders recreated on navigation**: After deleting a folder, navigating away and back recreated it
-   - Cause: `seedTestFolders()` runs on every page load and recreates Music/Art if missing
-   - Resolution: Expected temporary behavior for Phase 4b testing; will be removed in Phase 5
-
-#### Testing (All 8 tests passed)
-- [x] After seed: Music folder contains RD playlists (opposite of 4a)
-- [x] After seed: Art folder contains OL playlists (opposite of 4a)
-- [x] Select "Music" → only RD-prefixed playlists visible (swapped)
-- [x] Select "Art" → only OL-prefixed playlists visible (swapped)
-- [x] Select "Unassigned" → only PL/FL/LL/WL playlists visible
-- [x] Select "All Playlists" → all playlists visible
-- [x] Reload page → folders and assignments persist
-- [x] Delete selected folder, reload → resets to All Playlists, folder removed from dropdown
-
-#### Lessons learned
-- Storage-based testing benefits from swapped assignments to visually confirm different behavior from hard-coded logic
-- Debug logging with verification steps (`VERIFY` logs) helps diagnose seeding issues
-- Deleted folder handling needs both label update AND menu refresh
-
-#### Files changed
-- Modified: `src/content/youtube.ts` (removed test code, added storage-based lookup, seeding, deleted folder handling)
-- Modified: `DEVPLAN.md` (Phase 4b specification and testing results)
-
----
-
-### [2026-01-14] Phase 4a: Hard-coded Filtering
-
-#### What was done
-- Added playlist caching: `cachedPlaylists` variable, `ensurePlaylistsCached()`, `clearPlaylistCache()`
-- Added prefix-based test assignments: `getTestFolderIdForPlaylist()` (OL→Music, RD→Art)
-- Added filtering logic: `applyFolderFilter()` shows/hides playlist cards based on selection
-- Hard-coded test folders in dropdown: "🎵 Music (OL test)", "🎨 Art (RD test)"
-- Modified `handleFolderSelect()` to apply filter after saving selection
-- Modified `init()` to scrape playlists and apply filter on page load via `initializeFilterOnLoad()`
-- Added `getFolderLabel()` handling for test folder IDs
-
-#### Issues encountered
-- Bug: Test folders showed "All Folders" in button label instead of folder name
-  - Cause: `getFolderLabel()` didn't know about test folder IDs (not in storage)
-  - Fix: Added explicit handling for `TEST_FOLDER_MUSIC` and `TEST_FOLDER_ART` constants
-
-#### Testing (All 7 tests passed)
-- [x] Select "All Playlists" → all playlist cards visible
-- [x] Select "Music" → only OL-prefixed playlists visible
-- [x] Select "Art" → only RD-prefixed playlists visible
-- [x] Select "Unassigned" → only PL/FL/LL/WL-prefixed playlists visible
-- [x] Switch between folders → visibility updates correctly
-- [x] Reload with folder selected → filter applied automatically
-- [x] Empty folder → no playlists visible
-
-#### Lessons learned
-- Test folders need explicit handling in all display functions, not just menu building
-- Prefix-based filtering is effective for testing without specific IDs
-
-#### Files changed
-- Modified: `src/content/youtube.ts` (caching, filtering, test folders)
-- Modified: `DEVPLAN.md` (Phase 4a specification and testing)
-
----
-
 ### [2026-01-13] Phase 3: Storage Integration
 
 #### What was done
@@ -316,14 +231,88 @@ Each entry follows this structure:
 
 ---
 
-## Upcoming
+### [2026-01-14] Phase 4a: Hard-coded Filtering
 
-**Next**: Phase 5 - Organization Modal
-- Create modal structure for playlist management
-- Implement folder sidebar with counts
-- Create playlist grid
-- Add drag-and-drop or click-to-assign functionality
-- Save/Cancel with confirmation
+#### What was done
+- Added playlist caching: `cachedPlaylists` variable, `ensurePlaylistsCached()`, `clearPlaylistCache()`
+- Added prefix-based test assignments: `getTestFolderIdForPlaylist()` (OL→Music, RD→Art)
+- Added filtering logic: `applyFolderFilter()` shows/hides playlist cards based on selection
+- Hard-coded test folders in dropdown: "🎵 Music (OL test)", "🎨 Art (RD test)"
+- Modified `handleFolderSelect()` to apply filter after saving selection
+- Modified `init()` to scrape playlists and apply filter on page load via `initializeFilterOnLoad()`
+- Added `getFolderLabel()` handling for test folder IDs
+
+#### Issues encountered
+- Bug: Test folders showed "All Folders" in button label instead of folder name
+  - Cause: `getFolderLabel()` didn't know about test folder IDs (not in storage)
+  - Fix: Added explicit handling for `TEST_FOLDER_MUSIC` and `TEST_FOLDER_ART` constants
+
+#### Testing (All 7 tests passed)
+- [x] Select "All Playlists" → all playlist cards visible
+- [x] Select "Music" → only OL-prefixed playlists visible
+- [x] Select "Art" → only RD-prefixed playlists visible
+- [x] Select "Unassigned" → only PL/FL/LL/WL-prefixed playlists visible
+- [x] Switch between folders → visibility updates correctly
+- [x] Reload with folder selected → filter applied automatically
+- [x] Empty folder → no playlists visible
+
+#### Lessons learned
+- Test folders need explicit handling in all display functions, not just menu building
+- Prefix-based filtering is effective for testing without specific IDs
+
+#### Files changed
+- Modified: `src/content/youtube.ts` (caching, filtering, test folders)
+- Modified: `DEVPLAN.md` (Phase 4a specification and testing)
+
+---
+
+### [2026-01-14] Phase 4b: Storage-based Filtering
+
+#### What was done
+- Removed all Phase 4a hard-coded test logic:
+  - Removed `TEST_FOLDER_MUSIC` and `TEST_FOLDER_ART` constants
+  - Removed `getTestFolderIdForPlaylist()` function
+  - Removed test folder hard-coding from `buildMenuItems()` and `getFolderLabel()`
+- Added storage-based folder lookup:
+  - Added `getFolderIdForPlaylist(playlistId, folders)` - looks up playlist in folder's `playlistIds` array
+  - Added `seedTestFolders()` - creates Music/Art folders with SWAPPED assignments (OL→Art, RD→Music)
+- Modified `applyFolderFilter()`:
+  - Loads folders from storage
+  - Uses `getFolderIdForPlaylist()` for lookup
+  - Handles deleted folder edge case: silent reset to All Playlists + dropdown refresh
+- Modified `initializeFilterOnLoad()` to call `seedTestFolders()` and `refreshDropdownMenu()`
+
+#### Issues encountered
+1. **Wrong playlists shown after seeding**: Initially, playlists shown didn't match RD/OL prefixes
+   - Cause: User had old Music/Art folders from Phase 3 with stale data
+   - Fix: Added extensive debug logging to verify seeding; clearing storage resolved issue
+
+2. **Deleted folder remained in dropdown**: After deleting folder via DevTools, it still appeared in dropdown
+   - Cause: `applyFolderFilter()` updated label but didn't refresh menu
+   - Fix: Added `await refreshDropdownMenu()` after detecting deleted folder
+
+3. **Deleted folders recreated on navigation**: After deleting a folder, navigating away and back recreated it
+   - Cause: `seedTestFolders()` runs on every page load and recreates Music/Art if missing
+   - Resolution: Expected temporary behavior for Phase 4b testing; will be removed in Phase 5
+
+#### Testing (All 8 tests passed)
+- [x] After seed: Music folder contains RD playlists (opposite of 4a)
+- [x] After seed: Art folder contains OL playlists (opposite of 4a)
+- [x] Select "Music" → only RD-prefixed playlists visible (swapped)
+- [x] Select "Art" → only OL-prefixed playlists visible (swapped)
+- [x] Select "Unassigned" → only PL/FL/LL/WL playlists visible
+- [x] Select "All Playlists" → all playlists visible
+- [x] Reload page → folders and assignments persist
+- [x] Delete selected folder, reload → resets to All Playlists, folder removed from dropdown
+
+#### Lessons learned
+- Storage-based testing benefits from swapped assignments to visually confirm different behavior from hard-coded logic
+- Debug logging with verification steps (`VERIFY` logs) helps diagnose seeding issues
+- Deleted folder handling needs both label update AND menu refresh
+
+#### Files changed
+- Modified: `src/content/youtube.ts` (removed test code, added storage-based lookup, seeding, deleted folder handling)
+- Modified: `DEVPLAN.md` (Phase 4b specification and testing results)
 
 ---
 
