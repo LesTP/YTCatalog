@@ -381,12 +381,92 @@ YTCatalog/
 - [x] Sidebar counts update correctly
 - [x] Dropdown no longer shows deleted folder
 
-### Phase 6: Polish & Testing ← CURRENT
-- [ ] Error handling
-- [ ] Edge cases
-- [ ] Cross-browser testing
-- [ ] Performance optimization
-- [ ] Accessibility improvements
+### Phase 6: Export/Import Folders ✓
+
+**Goal**: Allow users to export their folder structure to a JSON file and import it back (for backup, transfer, or sharing).
+
+**Key Design Decisions**:
+- Simplified export format: name + playlistIds only, no internal IDs (D-20)
+- Import merge strategy: Replace existing folders with same name (D-21)
+- Playlist reassignment: Last folder wins, consistent with existing behavior (D-22)
+- UI placement: Modal sidebar footer, below "+ New Folder" (D-23)
+- File naming: `ytcatalog-folders-YYYY-MM-DD.json` (D-24)
+
+#### Phase 6a: Export Functionality ✓
+
+**Scope**: Export all folders to a downloadable JSON file.
+
+**Export Format**:
+```json
+{
+  "version": 1,
+  "exportedAt": "2026-01-18T09:10:00Z",
+  "folders": [
+    { "name": "Music", "playlistIds": ["PL123", "PL456"] },
+    { "name": "Art", "playlistIds": ["OL789"] }
+  ]
+}
+```
+
+**Tasks**:
+- [x] Add `ExportData` type to types.ts
+- [x] Add `buildExportData()` function to storage.ts
+- [x] Add "Export" button to modal sidebar footer (modal.ts, modal.css)
+- [x] Implement `handleExport()` - build JSON, trigger download
+- [x] File named `ytcatalog-folders-YYYY-MM-DD.json`
+
+**Testing**:
+- [x] Click Export → downloads JSON file with correct name
+- [x] Exported file contains correct JSON structure (version, exportedAt, folders)
+- [x] Exported file contains all folders with correct names and playlistIds
+- [ ] TODO: Export with no folders → downloads file with empty folders array
+
+#### Phase 6b: Import Functionality ✓
+
+**Scope**: Import folders from a JSON file, replacing existing folders with same name.
+
+**Tasks**:
+- [x] Add `ImportResult` type to types.ts (success/error with message)
+- [x] Add `validateImportData()` function to storage.ts
+- [x] Add `importFolders()` function to storage.ts (handles merge with replace strategy)
+- [x] Add "Import" button to modal sidebar footer
+- [x] Add hidden file input element for file picker
+- [x] Implement `handleImport()` - read file, validate, import, refresh UI
+- [x] Show success message with count of folders imported
+- [x] Show error message for invalid JSON or wrong structure
+- [x] Added `isStorageAvailable()` defensive check for extension context invalidation
+
+**Import Behavior**:
+- Existing folder with same name → replaced with imported data
+- New folder name → created with new ID
+- Playlist in multiple imported folders → last folder wins
+- Playlist already assigned → reassigned to imported folder
+
+**Testing - Happy Path**:
+- [x] Click Import → file picker opens
+- [x] Select valid file → folders imported, sidebar refreshes
+- [ ] TODO: Import replaces existing folder with same name
+- [x] Import adds new folders alongside existing ones
+- [ ] TODO: Playlist reassignment works correctly
+- [x] Success message shows count of imported folders
+
+**Testing - Error Handling**:
+- [x] Cancel file picker → no change, no error
+- [ ] TODO: Invalid JSON → error message "Invalid file format"
+- [ ] TODO: Missing version field → error message
+- [ ] TODO: Missing folders array → error message
+- [ ] TODO: Wrong file type (not .json) → error message or graceful handling
+
+### Phase 7: Grid Layout Fix
+- [ ] Investigate YouTube's CSS layout behavior with hidden items
+- [ ] Implement solution for grid gaps when filtering
+- [ ] Test across different playlist counts and screen sizes
+
+### Phase 8: Firefox Compatibility
+- [ ] Add webextension-polyfill or conditional API code
+- [ ] Update manifest for Firefox compatibility
+- [ ] Test all features in Firefox
+- [ ] Document any browser-specific limitations
 
 ### YouTube DOM Selectors (Phase 2a Research)
 
@@ -460,6 +540,7 @@ ytd-rich-item-renderer[lockup="true"]
 **Nice to Have:**
 - [ ] **Save/Cancel workflow**: Add undo capability or Save/Cancel for modal changes
 - [ ] **Remove/hide test hotkey**: Remove `Ctrl+Shift+Y` testing feature or hide behind debug flag
+- [ ] **Import conflict dialog**: Add "Ask" dialog for import conflicts instead of auto-replace (see D-21)
 
 #### Later
 - Cloud sync functionality
@@ -707,6 +788,83 @@ Decision: Apply changes immediately (no Save/Cancel workflow)
 Rationale: Simpler UX, no risk of losing work, matches modern patterns
 Trade-offs: No bulk "undo" if user makes mistakes
 Revisit if: Users request undo capability (see Phase 6 candidates for Save/Cancel option)
+```
+
+```
+D-20: Export Format
+Date: 2026-01-18
+Status: Closed
+
+Decision: Simplified export format with name + playlistIds only, no internal IDs
+Format:
+{
+  "version": 1,
+  "exportedAt": "2026-01-18T09:10:00Z",
+  "folders": [
+    { "name": "Music", "playlistIds": ["PL123", "PL456"] }
+  ]
+}
+Rationale:
+- Internal folder IDs are implementation details, not meaningful to users
+- Simpler format for manual editing if desired
+- Avoids ID collision issues on import (new IDs generated)
+Trade-offs: Cannot preserve folder identity across export/import cycles
+Revisit if: Need to track folder identity for sync or versioning
+```
+
+```
+D-21: Import Merge Strategy
+Date: 2026-01-18
+Status: Closed
+
+Decision: Replace existing folders with same name when importing
+Rationale:
+- Simplest to implement for MVP
+- Export/Import typically used for restore/transfer scenarios where replacement is expected
+- Users can clear storage before importing for clean slate
+Trade-offs: Existing folder content lost if same-name folder imported
+Revisit if: Users request "Ask" dialog for conflict resolution (see Future Plans)
+```
+
+```
+D-22: Import Playlist Reassignment
+Date: 2026-01-18
+Status: Closed
+
+Decision: Last folder wins when playlist appears in multiple places
+Rationale:
+- Consistent with existing addPlaylistToFolder() behavior
+- Single folder per playlist constraint (D-2) requires deterministic resolution
+Trade-offs: If playlist in multiple imported folders, order matters
+Revisit if: N/A - consistent with existing architecture
+```
+
+```
+D-23: Export/Import UI Placement
+Date: 2026-01-18
+Status: Closed
+
+Decision: Modal sidebar footer, below "+ New Folder" button
+Rationale:
+- Logically grouped with folder management actions
+- Doesn't clutter main content area or modal header
+- Visible without scrolling (sidebar footer is always visible)
+Trade-offs: Slightly hidden; requires opening modal to access
+Revisit if: Users request quick-access export from dropdown
+```
+
+```
+D-24: Export File Naming
+Date: 2026-01-18
+Status: Closed
+
+Decision: File named `ytcatalog-folders-YYYY-MM-DD.json`
+Rationale:
+- Descriptive and self-documenting
+- Date suffix helps version multiple exports
+- Example: ytcatalog-folders-2026-01-18.json
+Trade-offs: None significant
+Revisit if: N/A
 ```
 
 ---

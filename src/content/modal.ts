@@ -4,7 +4,7 @@
  */
 
 import { folderStorage } from '../shared/storage';
-import { Folder } from '../shared/types';
+import { Folder, ExportData } from '../shared/types';
 
 // ============================================================================
 // Types
@@ -198,6 +198,10 @@ function buildSidebarHTML(): string {
     </div>
     <div class="ytcatalog-sidebar-footer">
       <button class="ytcatalog-sidebar-new-folder">+ New Folder</button>
+      <div class="ytcatalog-sidebar-actions">
+        <button class="ytcatalog-sidebar-export">Export</button>
+        <button class="ytcatalog-sidebar-import">Import</button>
+      </div>
     </div>
   `;
 
@@ -334,6 +338,24 @@ function attachSidebarEventListeners(): void {
       }
     });
   });
+
+  // Export button
+  const exportBtn = sidebar.querySelector('.ytcatalog-sidebar-export');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await handleExport();
+    });
+  }
+
+  // Import button
+  const importBtn = sidebar.querySelector('.ytcatalog-sidebar-import');
+  if (importBtn) {
+    importBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await handleImport();
+    });
+  }
 }
 
 /**
@@ -409,6 +431,124 @@ async function handleDeleteFolderInModal(folderId: string): Promise<void> {
 
   renderSidebar();
   renderContent();
+}
+
+// ============================================================================
+// Export/Import (Phase 6)
+// ============================================================================
+
+/**
+ * Generate a date string for the export filename (YYYY-MM-DD format)
+ */
+function getExportDateString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Handle export button click - downloads folders as JSON file
+ */
+async function handleExport(): Promise<void> {
+  try {
+    // Build export data
+    const exportData = await folderStorage.buildExportData();
+
+    // Convert to JSON string with pretty printing
+    const jsonString = JSON.stringify(exportData, null, 2);
+
+    // Create blob and download link
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    // Create temporary download link and trigger download
+    const filename = `ytcatalog-folders-${getExportDateString()}.json`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('YTCatalog: Export failed', error);
+    alert('Failed to export folders. Please try again.');
+  }
+}
+
+/**
+ * Handle import button click - opens file picker and imports folders from JSON
+ */
+async function handleImport(): Promise<void> {
+  // Create hidden file input
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.json,application/json';
+  fileInput.style.display = 'none';
+
+  // Handle file selection
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) {
+      document.body.removeChild(fileInput);
+      return;
+    }
+
+    try {
+      // Read file contents
+      const text = await file.text();
+
+      // Parse JSON
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        alert('Invalid file format: not valid JSON');
+        document.body.removeChild(fileInput);
+        return;
+      }
+
+      // Validate structure
+      const validationError = folderStorage.validateImportData(data);
+      if (validationError) {
+        alert(validationError);
+        document.body.removeChild(fileInput);
+        return;
+      }
+
+      // Import folders
+      const result = await folderStorage.importFolders(data as ExportData);
+
+      if (result.success) {
+        // Refresh cached folders and re-render
+        cachedFolders = await folderStorage.getFolders();
+        renderSidebar();
+        renderContent();
+        alert(result.message);
+      } else {
+        alert(result.error);
+      }
+    } catch (error) {
+      console.error('YTCatalog: Import failed', error);
+      alert('Failed to import folders. Please try again.');
+    }
+
+    // Clean up
+    document.body.removeChild(fileInput);
+  });
+
+  // Handle cancel (no file selected)
+  fileInput.addEventListener('cancel', () => {
+    document.body.removeChild(fileInput);
+  });
+
+  // Trigger file picker
+  document.body.appendChild(fileInput);
+  fileInput.click();
 }
 
 // ============================================================================

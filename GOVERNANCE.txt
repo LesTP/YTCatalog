@@ -3,9 +3,9 @@ This document defines the high-level rules and expectations for development work
 
 ~ DOCUMENTATION ~
 
-Documentation must provide enough context of intent, constraints, and decisions for a collaborator/model that starts cold each session.
+Documentation must provide enough context of intent, constraints, and decisions for a collaborator/model to start cold each session.
 
-* You have no memory outside this repo.
+* The docs are the source of truth, do not rely on previous conversations.
 * If something is ambiguous, ASK (don’t guess).
 * Prioritize clarity over speed.
 
@@ -27,8 +27,8 @@ When a decision is needed, present options following this template:
 ```
 D-#: [Decision Title]
 Date: YYYY-MM-DD
-Status: Open / Closed
-
+Status: [Open / Closed]
+Priority: [Critical / Important / Nice-to-have]
 Decision:
 Rationale:
 Trade-offs:
@@ -77,8 +77,7 @@ Set-up/initial iteration (greenfield projects):
 - discuss the overall goal/purpose
 - define use cases
 - make architecture and tool choices
-- determine MVP
-- define specific features for this dev cycle and put everything else into "Future plans"
+- define specific MVP features and put everything else into "Future plans"
 - break into distinct individual features that can be worked on in separate sequential iterations called Phases
 - set up documentation and document everything in the README and DEVPLAN
 
@@ -87,19 +86,25 @@ Actual dev phases, one phase per feature, each phase consisting of one or more s
 "Phase #n, feature" (e.g. Phase 5, add item to favorites), discuss mode only:
 - determine the scope of this phase and specific outcomes
 - break into smallest possible steps, to be implemented and tested individually (e.g. Phase 5a, create a favorites page; Phase 5b, add "fav_bool" field to the item table)
-- update DEVPLAN
+- create a checkbox list of tests which
+ -- correspond to the items in scope for this phase 
+ -- could be manually executed and visually observed
+- update DEVPLAN with the above
 
 Implement individual steps (e.g. Phase 5b, add fav_bool field):
 - Discuss:
  -- determine specific changes, tech specs, files to be changed/added
  -- identify and document choices, discuss with user and document decisions using template
- -- outline the testing procedures
- -- update DEVPLAN
+ -- create a checkbox list of tests which correspond to the items in scope for this step and could be manually executed and visually observed
+ -- update DEVPLAN with the above
 - Code/debug
-- Update DEVLOG upon completion
+- Run tests defined in step discussion
+- Update DEVLOG only upon confirmation that all tests pass
 - Commit
 
-After a phase is completed, review.
+When all steps in a phase are completed
+- run tests defined in phase discussion 
+- review
 Update DEVLOG with any changes.
 Make one more pass to clean up documentation (remove redundancies, fix drift). 
 Commit.

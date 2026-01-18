@@ -441,11 +441,63 @@ MutationObserver with debouncing:
 
 ---
 
-## Issue Tracker
+### [2026-01-18] Phase 6: Export/Import Folders
 
-| ID | Status | Description | Resolution |
-|----|--------|-------------|------------|
-| - | - | No issues logged yet | - |
+#### What was done
+- **Phase 6a: Export Functionality**
+  - Added `ExportFolder` and `ExportData` interfaces to types.ts
+  - Added `buildExportData()` method to FolderStorage class
+  - Added Export button to modal sidebar footer with styling
+  - Implemented `handleExport()` - builds JSON, triggers browser download
+  - File naming convention: `ytcatalog-folders-YYYY-MM-DD.json`
+
+- **Phase 6b: Import Functionality**
+  - Added `ImportResult` discriminated union type to types.ts
+  - Added `validateImportData()` method - validates JSON structure, version, folders array
+  - Added `importFolders()` method - handles merge with replace strategy (D-21), last folder wins for playlist assignment (D-22)
+  - Added Import button to modal sidebar footer
+  - Implemented `handleImport()` - file picker, JSON parsing, validation, import, UI refresh
+  - Success/error messages via alert
+
+- **Bug Fix: Extension Context Invalidation**
+  - Added `isStorageAvailable()` defensive check to storage.ts
+  - Prevents crash when extension is reloaded while YouTube tab is open
+  - Gracefully returns empty data and logs warning instead of throwing
+
+#### Issues encountered
+1. **Extension reload error**: `Cannot read properties of undefined (reading 'local')`
+   - Cause: When Chrome extension is reloaded, content scripts in open tabs become "orphaned" and lose access to Chrome APIs
+   - Fix: Added `isStorageAvailable()` check that returns gracefully with empty data
+   - Note: User must refresh the page after reloading the extension (expected Chrome behavior)
+
+#### Lessons learned
+- Chrome extension reloads invalidate content script contexts - defensive checks needed
+- Hidden file input element is the standard approach for triggering file picker in web apps
+- Blob + URL.createObjectURL is the standard approach for triggering downloads
+
+#### Files changed
+- Modified: `src/shared/types.ts` (added ExportFolder, ExportData, ImportResult)
+- Modified: `src/shared/storage.ts` (added isStorageAvailable, buildExportData, validateImportData, importFolders)
+- Modified: `src/content/modal.ts` (added Export/Import buttons, handleExport, handleImport)
+- Modified: `src/styles/modal.css` (added sidebar-actions, export/import button styles)
+
+#### Testing
+**Export (Phase 6a)**:
+- [x] Click Export → downloads JSON file with correct name
+- [x] Exported file contains correct JSON structure
+- [x] Exported file contains all folders with correct names and playlistIds
+- [ ] TODO: Export with no folders
+
+**Import (Phase 6b)**:
+- [x] Click Import → file picker opens
+- [x] Select valid file → folders imported, sidebar refreshes
+- [x] Import adds new folders alongside existing ones
+- [x] Success message shows count of imported folders
+- [x] Cancel file picker → no change, no error
+- [ ] TODO: Import replaces existing folder with same name
+- [ ] TODO: Playlist reassignment works correctly
+- [ ] TODO: Invalid JSON error handling
+- [ ] TODO: Missing version/folders error handling
 
 ---
 

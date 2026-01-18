@@ -3,7 +3,21 @@
  * Handles all chrome.storage.local operations
  */
 
-import { Folder, StorageState } from './types';
+import { Folder, StorageState, ExportData, ExportFolder, ImportResult } from './types';
+
+/**
+ * Check if chrome.storage API is available
+ * Returns false if extension context was invalidated (e.g., after extension reload)
+ */
+function isStorageAvailable(): boolean {
+  try {
+    return typeof chrome !== 'undefined' &&
+           typeof chrome.storage !== 'undefined' &&
+           typeof chrome.storage.local !== 'undefined';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Result type for folder creation
@@ -20,6 +34,10 @@ export class FolderStorage {
    * Get all folders from storage
    */
   async getFolders(): Promise<Record<string, Folder>> {
+    if (!isStorageAvailable()) {
+      console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
+      return {};
+    }
     const result = await chrome.storage.local.get('folders');
     return (result.folders as Record<string, Folder>) || ({} as Record<string, Folder>);
   }
@@ -28,6 +46,10 @@ export class FolderStorage {
    * Save all folders to storage
    */
   async saveFolders(folders: Record<string, Folder>): Promise<void> {
+    if (!isStorageAvailable()) {
+      console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
+      return;
+    }
     await chrome.storage.local.set({ folders });
   }
 
@@ -144,10 +166,14 @@ export class FolderStorage {
     await this.saveFolders(folders);
   }
 
-  /**
+/**
    * Get the complete storage state
    */
   async getState(): Promise<StorageState> {
+    if (!isStorageAvailable()) {
+      console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
+      return { folders: {} };
+    }
     const result = await chrome.storage.local.get(['folders', 'selectedFolderId']);
     return {
       folders: (result.folders as Record<string, Folder>) || ({} as Record<string, Folder>),
@@ -160,6 +186,10 @@ export class FolderStorage {
    * Returns null if "all" is selected (no specific folder)
    */
   async getSelectedFolderId(): Promise<string | null> {
+    if (!isStorageAvailable()) {
+      console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
+      return null;
+    }
     const result = await chrome.storage.local.get('selectedFolderId');
     return (result.selectedFolderId as string) || null;
   }
@@ -169,6 +199,10 @@ export class FolderStorage {
    * Pass null to select "all playlists"
    */
   async setSelectedFolderId(id: string | null): Promise<void> {
+    if (!isStorageAvailable()) {
+      console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
+      return;
+    }
     if (id === null) {
       await chrome.storage.local.remove('selectedFolderId');
     } else {
@@ -176,11 +210,171 @@ export class FolderStorage {
     }
   }
 
-  /**
+/**
    * Generate a unique ID for folders
    */
   private generateId(): string {
     return `folder_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+/**
+   * Build export data from current folders
+   * Returns simplified format with name + playlistIds only (no internal IDs)
+   */
+  async buildExportData(): Promise<ExportData> {
+    const folders = await this.getFolders();
+
+    const exportFolders: ExportFolder[] = Object.values(folders)
+      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+      .map((folder) => ({
+        name: folder.name,
+        playlistIds: [...folder.playlistIds],
+      }));
+
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      folders: exportFolders,
+    };
+  }
+
+  /**
+   * Validate import data structure
+   * Returns error message if invalid, null if valid
+   */
+  validateImportData(data: unknown): string | null {
+    if (!data || typeof data !== 'object') {
+      return 'Invalid file format: expected JSON object';
+    }
+
+    const obj = data as Record<string, unknown>;
+
+    // Check version field
+    if (typeof obj.version !== 'number') {
+      return 'Invalid file format: missing or invalid version field';
+    }
+
+    // Check folders array
+    if (!Array.isArray(obj.folders)) {
+      return 'Invalid file format: missing or invalid folders array';
+    }
+
+    // Validate each folder
+    for (let i = 0; i < obj.folders.length; i++) {
+      const folder = obj.folders[i] as Record<string, unknown>;
+
+      if (!folder || typeof folder !== 'object') {
+        return `Invalid folder at index ${i}: expected object`;
+      }
+
+      if (typeof folder.name !== 'string' || !folder.name.trim()) {
+        return `Invalid folder at index ${i}: missing or empty name`;
+      }
+
+      if (!Array.isArray(folder.playlistIds)) {
+        return `Invalid folder "${folder.name}": missing or invalid playlistIds array`;
+      }
+
+      // Validate playlistIds are strings
+      for (const id of folder.playlistIds) {
+        if (typeof id !== 'string') {
+          return `Invalid folder "${folder.name}": playlistIds must be strings`;
+        }
+      }
+    }
+
+    return null; // Valid
+  }
+
+  /**
+   * Import folders from export data
+   * Merge strategy: Replace existing folders with same name (D-21)
+   * Playlist assignment: Last folder wins (D-22)
+   */
+  async importFolders(data: ExportData): Promise<ImportResult> {
+    try {
+      const existingFolders = await this.getFolders();
+      const importedFolders = data.folders;
+
+      // Track playlist assignments to handle "last folder wins" rule
+      // Maps playlistId -> folderId
+      const playlistAssignments = new Map<string, string>();
+
+      // First pass: Collect all playlist assignments from existing folders
+      // (these may be overwritten by imported folders)
+      for (const folder of Object.values(existingFolders)) {
+        for (const playlistId of folder.playlistIds) {
+          playlistAssignments.set(playlistId, folder.id);
+        }
+      }
+
+      // Build a map of existing folder names (lowercase) to their IDs
+      const existingNameToId = new Map<string, string>();
+      for (const folder of Object.values(existingFolders)) {
+        existingNameToId.set(folder.name.toLowerCase(), folder.id);
+      }
+
+      // Process imported folders
+      let foldersImported = 0;
+      for (const importedFolder of importedFolders) {
+        const folderName = importedFolder.name.trim();
+        const existingId = existingNameToId.get(folderName.toLowerCase());
+
+        let folderId: string;
+
+        if (existingId) {
+          // Replace existing folder with same name
+          folderId = existingId;
+          existingFolders[folderId] = {
+            id: folderId,
+            name: folderName,
+            playlistIds: [], // Will be populated below
+          };
+        } else {
+          // Create new folder
+          folderId = this.generateId();
+          existingFolders[folderId] = {
+            id: folderId,
+            name: folderName,
+            playlistIds: [],
+          };
+          existingNameToId.set(folderName.toLowerCase(), folderId);
+        }
+
+        // Update playlist assignments (last folder wins)
+        for (const playlistId of importedFolder.playlistIds) {
+          playlistAssignments.set(playlistId, folderId);
+        }
+
+        foldersImported++;
+      }
+
+      // Second pass: Rebuild playlistIds arrays based on final assignments
+      for (const folder of Object.values(existingFolders)) {
+        folder.playlistIds = [];
+      }
+
+      for (const [playlistId, folderId] of playlistAssignments) {
+        if (existingFolders[folderId]) {
+          existingFolders[folderId].playlistIds.push(playlistId);
+        }
+      }
+
+      // Save updated folders
+      await this.saveFolders(existingFolders);
+
+      return {
+        success: true,
+        foldersImported,
+        message: `Successfully imported ${foldersImported} folder${foldersImported === 1 ? '' : 's'}`,
+      };
+    } catch (error) {
+      console.error('YTCatalog: Import failed', error);
+      return {
+        success: false,
+        error: 'Failed to import folders. Please try again.',
+      };
+    }
   }
 }
 

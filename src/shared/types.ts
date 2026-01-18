@@ -35,3 +35,27 @@ export interface ExtensionMessage {
   type: MessageType;
   data?: unknown;
 }
+
+/**
+ * Folder data for export (simplified format without internal IDs)
+ */
+export interface ExportFolder {
+  name: string;
+  playlistIds: string[];
+}
+
+/**
+ * Export data structure for JSON file
+ */
+export interface ExportData {
+  version: number;
+  exportedAt: string;
+  folders: ExportFolder[];
+}
+
+/**
+ * Result type for import operations
+ */
+export type ImportResult =
+  | { success: true; foldersImported: number; message: string }
+  | { success: false; error: string };
