@@ -13,7 +13,8 @@ import { Folder, ExportData } from '../shared/types';
 interface PlaylistInfo {
   id: string;
   title: string;
-  thumbnailUrl: string;
+  channelName: string; // Channel name or "Your playlist" for own playlists
+  videoCount: string;  // e.g., "42 videos" or "Playlist"
 }
 
 // ============================================================================
@@ -33,7 +34,7 @@ let cachedPlaylists: PlaylistInfo[] = [];
 
 /**
  * Scrape playlist info from the DOM for the modal.
- * This is a simplified version that gets id, title, and thumbnail.
+ * Extracts id, title, channel name, and video count.
  */
 function scrapePlaylistsForModal(): PlaylistInfo[] {
   const gridContainer = document.querySelector('ytd-two-column-browse-results-renderer:not([page-subtype="home"])');
@@ -80,14 +81,27 @@ function scrapePlaylistsForModal(): PlaylistInfo[] {
     const titleEl = card.querySelector('h3[title]') as HTMLElement;
     const title = titleEl?.getAttribute('title') || titleEl?.textContent || 'Unknown Playlist';
 
-    // Extract thumbnail (basic scraping - may not work for all playlists due to YouTube lazy loading)
-    const thumbnailEl = card.querySelector('img') as HTMLImageElement;
-    const thumbnailUrl = (thumbnailEl?.src && !thumbnailEl.src.includes('data:')) ? thumbnailEl.src : '';
+    // Extract video count (e.g., "42 videos")
+    const videoCountEl = card.querySelector('.yt-badge-shape__text');
+    const videoCount = videoCountEl?.textContent?.trim() || 'Playlist';
+
+    // Extract channel name from links with /@username pattern
+    // Only present for saved playlists from other channels
+    const channelLink = card.querySelector('a[href*="/@"]') as HTMLAnchorElement;
+    let channelName = 'Your playlist';
+    if (channelLink) {
+      const channelText = channelLink.textContent?.trim();
+      // Filter out generic links like "Playlist" that also have /@ href
+      if (channelText && channelText !== 'Playlist' && channelText !== 'View full playlist') {
+        channelName = channelText;
+      }
+    }
 
     playlists.push({
       id,
       title: title.trim(),
-      thumbnailUrl,
+      channelName,
+      videoCount,
     });
   });
 
@@ -556,22 +570,22 @@ async function handleImport(): Promise<void> {
 // ============================================================================
 
 /**
- * Build the HTML for a single playlist card
+ * Build the HTML for a single playlist card (text-only layout)
  */
 function buildPlaylistCardHTML(playlist: PlaylistInfo): string {
   const isSelected = selectedPlaylistId === playlist.id;
   const selectedClass = isSelected ? 'selected' : '';
 
+  // Extract just the number from video count (e.g., "42 videos" -> "42")
+  const countMatch = playlist.videoCount.match(/(\d+)/);
+  const countDisplay = countMatch ? countMatch[1] : '';
+
   return `
     <div class="ytcatalog-playlist-card ${selectedClass}" data-playlist-id="${playlist.id}">
-      <div class="ytcatalog-playlist-thumbnail">
-        ${playlist.thumbnailUrl
-          ? `<img src="${playlist.thumbnailUrl}" alt="${escapeHtml(playlist.title)}" loading="lazy" />`
-          : '<div class="ytcatalog-playlist-thumbnail-placeholder"></div>'
-        }
-      </div>
-      <div class="ytcatalog-playlist-info">
-        <span class="ytcatalog-playlist-title" title="${escapeHtml(playlist.title)}">${escapeHtml(playlist.title)}</span>
+      <div class="ytcatalog-playlist-title" title="${escapeHtml(playlist.title)}">${escapeHtml(playlist.title)}</div>
+      <div class="ytcatalog-playlist-meta">
+        <span class="ytcatalog-playlist-channel">${escapeHtml(playlist.channelName)}</span>
+        ${countDisplay ? `<span class="ytcatalog-playlist-separator">•</span><span class="ytcatalog-playlist-count">${countDisplay}</span>` : ''}
       </div>
     </div>
   `;

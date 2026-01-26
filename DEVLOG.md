@@ -591,6 +591,66 @@ MutationObserver with debouncing:
 
 ---
 
+### [2026-01-26] Phase 9a-9b: Text-Only Playlist Cards
+
+#### What was done
+- **Phase 9a: Update Data Model**
+  - Updated `PlaylistInfo` interface in modal.ts to add `channelName` and `videoCount` fields
+  - Updated `scrapePlaylistsForModal()` to extract:
+    - Channel name via `a[href*="/@"]` selector (saved playlists from other channels)
+    - Video count via `.yt-badge-shape__text` selector
+  - Implemented "Your playlist" fallback for user's own playlists (which don't show channel name)
+
+- **Phase 9b: Redesign Modal Playlist Cards**
+  - Updated `buildPlaylistCardHTML()` in modal.ts for text-only layout
+  - Removed all thumbnail-related HTML (img, placeholder)
+  - New card structure:
+    - Title (prominent, 14px, 500 weight, 2-line clamp)
+    - Metadata row: channel name • video count (12px, muted color)
+  - Extracts just the number from video count (e.g., "42 videos" → "42")
+  - Updated modal.css with new styles:
+    - `.ytcatalog-playlist-title` - prominent title styling
+    - `.ytcatalog-playlist-meta` - flexbox metadata row
+    - `.ytcatalog-playlist-channel` - ellipsis overflow for long names
+    - `.ytcatalog-playlist-separator` - bullet separator (•)
+    - `.ytcatalog-playlist-count` - video count number
+  - Removed old thumbnail-related CSS classes
+  - Increased grid column minimum width from 160px to 220px for text readability
+
+- **Build Configuration Update**
+  - Updated webpack.config.js to generate browser-specific manifests:
+    - Chrome build: `service_worker` only, no `browser_specific_settings`
+    - Firefox build: `scripts` array, includes `gecko` settings
+  - Added new npm scripts:
+    - `npm run build:chrome` (default) - Chrome-optimized build
+    - `npm run build:firefox` - Firefox-optimized build
+    - `npm run watch:firefox` - Watch mode for Firefox
+  - Updated `npm run dev:firefox` to run Firefox build first
+  - Cleaned up src/manifest.json (removed redundant `scripts` field)
+
+#### Issues encountered
+1. **Chrome manifest warning persisted after fix**
+   - Symptom: "'background.scripts' requires manifest version of 2 or lower" still shown
+   - Cause: Chrome caches extension service workers aggressively
+   - Fix: Remove and re-add extension in chrome://extensions, or restart Chrome
+   - Note: The generated manifest.json is correct; this is a Chrome caching issue
+
+#### Lessons learned
+- YouTube's DOM shows channel name only for saved playlists (not user's own playlists)
+- Text-only cards provide more consistent UX than unreliable thumbnails
+- Webpack's CopyWebpackPlugin `transform` function allows build-time manifest modification
+- Chrome's service worker caching can cause stale warnings even after fixes
+
+#### Files changed
+- Modified: `src/content/modal.ts` (PlaylistInfo interface, scraping, card HTML)
+- Modified: `src/styles/modal.css` (removed thumbnail styles, added text card styles)
+- Modified: `webpack.config.js` (browser-specific manifest generation)
+- Modified: `package.json` (browser-specific build scripts)
+- Modified: `src/manifest.json` (cleaned up redundant scripts field)
+- Modified: `DEVPLAN.md` (marked Phase 9a-9b complete)
+
+---
+
 ## Performance Notes
 
 *Reserved for performance observations and optimizations.*

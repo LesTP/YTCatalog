@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "description": "A browser extension for organizing YouTube playlists into folders.",
   "scripts": {
-    "build": "webpack --mode production",
-    "watch": "webpack --mode development --watch",
+    "build": "webpack --mode production --env browser=chrome",
+    "build:chrome": "webpack --mode production --env browser=chrome",
+    "build:firefox": "webpack --mode production --env browser=firefox",
+    "watch": "webpack --mode development --watch --env browser=chrome",
+    "watch:firefox": "webpack --mode development --watch --env browser=firefox",
     "dev": "web-ext run --source-dir ./dist/",
-    "dev:firefox": "web-ext run --source-dir ./dist/ --start-url https://www.youtube.com/feed/playlists",
-    "dev:chrome": "echo 'Load dist/ folder manually in chrome://extensions with Developer mode enabled'"
+    "dev:firefox": "npm run build:firefox && web-ext run --source-dir ./dist/ --start-url https://www.youtube.com/feed/playlists",
+    "dev:chrome": "echo 'Run npm run build:chrome, then load dist/ folder in chrome://extensions with Developer mode enabled'"
   },
   "keywords": ["youtube", "playlists", "browser-extension", "chrome-extension", "firefox-extension"],
   "author": "",

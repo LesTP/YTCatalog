@@ -647,10 +647,82 @@ ytd-rich-item-renderer[lockup="true"]
 
 ---
 
-### Future Plans (Post-MVP)
+### Phase 9: Text-Only Playlist Cards with Metadata ✓
 
-#### Next Priority
-- [ ] **Thumbnail loading for off-screen playlists**: YouTube lazy-loads images; off-screen playlist thumbnails don't load in modal. Consider placeholder images, title-only cards, or triggering scroll before modal opens.
+**Goal**: Replace unreliable thumbnail display with consistent text-based cards showing playlist metadata.
+
+**Problem**: YouTube lazy-loads images; playlists never scrolled into view have no loaded thumbnails. This makes playlists with generic titles (e.g., "lessons", "how to") hard to identify in the modal.
+
+**Solution**: Remove thumbnails entirely from modal playlist cards. Replace with text-based cards showing title, channel name, and video count for consistent, useful display.
+
+**Key Design Decision**: D-26 - Text-only cards with metadata (see Decisions section)
+
+#### DOM Research Findings (2026-01-26)
+
+| Metadata | Selector | Availability |
+|----------|----------|--------------|
+| Title | `h3[title]` attribute | ✅ Always available |
+| Video count | `.yt-badge-shape__text` | ✅ Always available |
+| Channel name | `a[href*="/@"]` text content | ⚠️ Only for saved playlists from other channels |
+| Visibility | `.yt-content-metadata-view-model__metadata-row` span | ✅ Shows "Private" for user's own playlists |
+| Updated date | `.yt-content-metadata-view-model__metadata-row` span | ✅ Shows "Updated X days ago" |
+
+**Key insight**: User's own playlists don't show channel name (they show visibility status instead). Saved playlists from other channels show the channel name.
+
+#### Phase 9a: Update Data Model ✓
+
+**Scope**: Add new metadata fields to playlist scraping.
+
+**Tasks**:
+- [x] Update `PlaylistInfo` interface in modal.ts to add `channelName` and `videoCount`
+- [x] Update `scrapePlaylistsForModal()` to extract channel name via `a[href*="/@"]`
+- [x] Update `scrapePlaylistsForModal()` to extract video count via `.yt-badge-shape__text`
+- [x] Use "Your playlist" as fallback when channel name not available
+
+#### Phase 9b: Redesign Modal Playlist Cards ✓
+
+**Scope**: Replace thumbnail-based cards with text-only cards.
+
+**Card Design**:
+```
+┌─────────────────────────────────┐
+│ Alternative Songs               │  <- Title (prominent)
+│ Anyone Can Play Guitar • 61     │  <- Channel • Video count
+└─────────────────────────────────┘
+
+┌─────────────────────────────────┐
+│ Guitar                          │
+│ Your playlist • 34              │  <- Fallback for own playlists
+└─────────────────────────────────┘
+```
+
+**Tasks**:
+- [x] Update `buildPlaylistCardHTML()` in modal.ts to use text-only layout
+- [x] Remove thumbnail image element
+- [x] Add channel name display with "Your playlist" fallback
+- [x] Add video count display (number only, extracted from "X videos")
+- [x] Update CSS for new card layout (compact, readable)
+- [x] Maintain click-to-select functionality
+
+#### Phase 9c: Cleanup
+
+**Scope**: Remove debug code and update documentation.
+
+**Tasks**:
+- [ ] Remove or simplify debug hotkey (Ctrl+Shift+Y)
+- [x] Update DEVLOG with implementation details
+- [ ] Delete cards.txt test file
+
+**Testing**:
+- [ ] Modal shows text-only cards with title, channel, and count
+- [ ] User's own playlists show "Your playlist" instead of channel name
+- [ ] Saved playlists show correct channel name
+- [ ] Cards are clickable and selection works
+- [ ] Appearance is clean and consistent
+
+---
+
+### Future Plans (Post-MVP)
 
 #### Medium Priority
 - [ ] **Bulk operations**: Multi-select playlists + bulk move to folder
@@ -658,7 +730,6 @@ ytd-rich-item-renderer[lockup="true"]
 
 #### Nice to Have
 - [ ] **Save/Cancel workflow**: Add undo capability or Save/Cancel for modal changes
-- [ ] **Remove/hide test hotkey**: Remove `Ctrl+Shift+Y` testing feature or hide behind debug flag
 - [ ] **Import conflict dialog**: Add "Ask" dialog for import conflicts instead of auto-replace (see D-21)
 
 #### Later
@@ -1013,6 +1084,42 @@ Trade-offs:
 - Must maintain our own compatibility layer
 
 Revisit if: Firefox changes compatibility behavior or new APIs are needed
+```
+
+```
+D-26: Modal Playlist Card Display
+Date: 2026-01-26
+Status: Closed
+
+Decision: Text-only cards with metadata (no thumbnails)
+
+Problem: YouTube lazy-loads images; playlists never scrolled into view have no loaded thumbnails. Makes generic-titled playlists hard to identify.
+
+Options Considered:
+A) Force scroll before modal opens - Slow, janky UX
+B) YouTube thumbnail API - Not feasible (needs video ID, not playlist ID)
+C) Add more metadata alongside thumbnails - Inconsistent (some have thumbnails, some don't)
+D) Text-only cards with metadata - Consistent, clean
+E) Hybrid (thumbnail if available, text fallback) - Inconsistent appearance
+
+Decision: Option D - Text-only cards with metadata
+
+Card format:
+- Title (prominent)
+- Channel name + video count (secondary line)
+- Fallback: "Your playlist" when channel name unavailable
+
+Rationale:
+- Consistent appearance for all playlists
+- Channel name helps identify saved playlists
+- Video count provides additional context
+- No broken/missing image issues
+
+Trade-offs:
+- Less visual than thumbnails
+- Channel name only available for saved playlists (not user's own)
+
+Revisit if: YouTube changes lazy loading behavior or provides reliable thumbnail API
 ```
 
 ---

@@ -15,6 +15,9 @@ const PLAYLISTS_FEED_PATTERN = /youtube\.com\/feed\/playlists/;
 const FOLDER_ID_ALL = '__all__';
 const FOLDER_ID_UNASSIGNED = '__unassigned__';
 
+// Lock to prevent concurrent injection attempts (race condition fix)
+let isInjecting = false;
+
 // ============================================================================
 // Playlist Caching
 // ============================================================================
@@ -782,7 +785,16 @@ async function createDropdown(): Promise<HTMLElement> {
  * Inject the dropdown into the chip bar
  */
 async function injectDropdown(): Promise<void> {
-  if (dropdownInjected || document.getElementById('ytcatalog-folder-dropdown')) {
+  // Prevent concurrent injection attempts (race condition fix for Firefox)
+  if (isInjecting) {
+    return;
+  }
+
+  // Check if already injected (by ID in DOM - more reliable than flag)
+  const existingDropdown = document.getElementById('ytcatalog-folder-dropdown');
+  if (existingDropdown) {
+    // Already exists - update the flag and return
+    dropdownInjected = true;
     return;
   }
 
@@ -791,9 +803,20 @@ async function injectDropdown(): Promise<void> {
     return;
   }
 
-  const dropdown = await createDropdown();
-  chipBar.insertBefore(dropdown, chipBar.firstChild);
-  dropdownInjected = true;
+  // Set lock before async operation
+  isInjecting = true;
+
+  try {
+    const dropdown = await createDropdown();
+
+    // Double-check no one else injected while we were creating
+    if (!document.getElementById('ytcatalog-folder-dropdown')) {
+      chipBar.insertBefore(dropdown, chipBar.firstChild);
+    }
+    dropdownInjected = true;
+  } finally {
+    isInjecting = false;
+  }
 }
 
 /**
@@ -801,7 +824,16 @@ async function injectDropdown(): Promise<void> {
  */
 async function init(): Promise<void> {
   if (isPlaylistsLibraryPage()) {
-    // Reset injection flag and clear cache when navigating
+    // Check if dropdown already exists in DOM (handles Firefox double-init)
+    const existingDropdown = document.getElementById('ytcatalog-folder-dropdown');
+    if (existingDropdown) {
+      dropdownInjected = true;
+      // Still refresh the filter/counts in case data changed
+      await initializeFilterOnLoad();
+      return;
+    }
+
+    // Reset injection flag and clear cache when navigating to fresh page
     dropdownInjected = false;
     clearPlaylistCache();
 
@@ -870,11 +902,61 @@ document.addEventListener('ytcatalog-folders-changed', async () => {
 // TODO: Remove or hide behind debug flag in Phase 6
 document.addEventListener('keydown', async (e) => {
   if (e.ctrlKey && e.shiftKey && e.key === 'Y') {
-    console.log('YTCatalog: Test triggered');
-    const playlists = await loadAndScrapeAllPlaylists();
-    console.log(`YTCatalog: Found ${playlists.length} playlists`);
-    playlists.slice(0, 5).forEach((p, i) => {
-      console.log(`  ${i + 1}. ${p.title} (ID: ${p.id})`);
+    console.log('YTCatalog: DOM Metadata Test');
+
+    // Use proper container scoping to get playlist cards, not video cards
+    const gridContainer = document.querySelector('ytd-two-column-browse-results-renderer:not([page-subtype="home"])');
+    if (!gridContainer) {
+      console.log('ERROR: Playlist grid container not found');
+      return;
+    }
+
+    const cards = gridContainer.querySelectorAll('ytd-rich-item-renderer[lockup="true"]');
+    console.log(`Found ${cards.length} playlist cards. Inspecting first 3...`);
+
+    Array.from(cards).slice(0, 3).forEach((card, i) => {
+      console.log(`\n=== Card ${i + 1} ===`);
+
+      // Title
+      const titleEl = card.querySelector('h3[title]') as HTMLElement;
+      console.log('Title:', titleEl?.getAttribute('title') || titleEl?.textContent || 'NOT FOUND');
+
+      // Video count
+      const countEl = card.querySelector('.yt-badge-shape__text');
+      console.log('Video count:', countEl?.textContent || 'NOT FOUND');
+
+      // Look for channel/owner in metadata area
+      const metadataArea = card.querySelector('.yt-lockup-metadata-view-model');
+      console.log('Metadata area HTML:', metadataArea?.innerHTML || 'NOT FOUND');
+
+      // Try common channel name selectors
+      const channelSelectors = [
+        'a.yt-lockup-metadata-view-model-wiz__byline',
+        '.yt-lockup-metadata-view-model-wiz__byline',
+        'a[href*="/channel/"]',
+        'a[href*="/@"]',
+        '.ytd-channel-name a',
+        '#channel-name',
+        '.yt-formatted-string[href*="/@"]',
+      ];
+
+      for (const sel of channelSelectors) {
+        const el = card.querySelector(sel);
+        if (el) {
+          console.log(`Channel (${sel}):`, el.textContent?.trim() || el.getAttribute('href'));
+        }
+      }
+
+      // Log all links in the card to find channel link
+      const allLinks = card.querySelectorAll('a[href]');
+      console.log('All links in card:');
+      allLinks.forEach((link) => {
+        const href = link.getAttribute('href');
+        const text = (link as HTMLElement).textContent?.trim();
+        if (href && !href.includes('/playlist?list=') && !href.includes('/watch?')) {
+          console.log(`  - "${text}" -> ${href}`);
+        }
+      });
     });
   }
 });
