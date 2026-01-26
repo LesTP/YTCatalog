@@ -5,9 +5,11 @@
   "scripts": {
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch",
-    "dev": "web-ext run --source-dir ./dist/"
+    "dev": "web-ext run --source-dir ./dist/",
+    "dev:firefox": "web-ext run --source-dir ./dist/ --start-url https://www.youtube.com/feed/playlists",
+    "dev:chrome": "echo 'Load dist/ folder manually in chrome://extensions with Developer mode enabled'"
   },
-  "keywords": ["youtube", "playlists", "browser-extension", "chrome-extension"],
+  "keywords": ["youtube", "playlists", "browser-extension", "chrome-extension", "firefox-extension"],
   "author": "",
   "license": "ISC",
   "devDependencies": {

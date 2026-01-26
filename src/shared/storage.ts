@@ -1,23 +1,10 @@
 /**
  * YTCatalog Storage Utilities
- * Handles all chrome.storage.local operations
+ * Handles all browser storage operations (Chrome and Firefox compatible)
  */
 
 import { Folder, StorageState, ExportData, ExportFolder, ImportResult } from './types';
-
-/**
- * Check if chrome.storage API is available
- * Returns false if extension context was invalidated (e.g., after extension reload)
- */
-function isStorageAvailable(): boolean {
-  try {
-    return typeof chrome !== 'undefined' &&
-           typeof chrome.storage !== 'undefined' &&
-           typeof chrome.storage.local !== 'undefined';
-  } catch {
-    return false;
-  }
-}
+import { storage, isStorageAvailable } from './browser-api';
 
 /**
  * Result type for folder creation
@@ -38,7 +25,7 @@ export class FolderStorage {
       console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
       return {};
     }
-    const result = await chrome.storage.local.get('folders');
+    const result = await storage.get('folders');
     return (result.folders as Record<string, Folder>) || ({} as Record<string, Folder>);
   }
 
@@ -50,7 +37,7 @@ export class FolderStorage {
       console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
       return;
     }
-    await chrome.storage.local.set({ folders });
+    await storage.set({ folders });
   }
 
   /**
@@ -166,7 +153,7 @@ export class FolderStorage {
     await this.saveFolders(folders);
   }
 
-/**
+  /**
    * Get the complete storage state
    */
   async getState(): Promise<StorageState> {
@@ -174,7 +161,7 @@ export class FolderStorage {
       console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
       return { folders: {} };
     }
-    const result = await chrome.storage.local.get(['folders', 'selectedFolderId']);
+    const result = await storage.get(['folders', 'selectedFolderId']);
     return {
       folders: (result.folders as Record<string, Folder>) || ({} as Record<string, Folder>),
       selectedFolderId: result.selectedFolderId as string | undefined,
@@ -190,7 +177,7 @@ export class FolderStorage {
       console.warn('YTCatalog: Extension context invalidated. Please refresh the page.');
       return null;
     }
-    const result = await chrome.storage.local.get('selectedFolderId');
+    const result = await storage.get('selectedFolderId');
     return (result.selectedFolderId as string) || null;
   }
 
@@ -204,20 +191,20 @@ export class FolderStorage {
       return;
     }
     if (id === null) {
-      await chrome.storage.local.remove('selectedFolderId');
+      await storage.remove('selectedFolderId');
     } else {
-      await chrome.storage.local.set({ selectedFolderId: id });
+      await storage.set({ selectedFolderId: id });
     }
   }
 
-/**
+  /**
    * Generate a unique ID for folders
    */
   private generateId(): string {
     return `folder_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
-/**
+  /**
    * Build export data from current folders
    * Returns simplified format with name + playlistIds only (no internal IDs)
    */

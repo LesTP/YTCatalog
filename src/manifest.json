@@ -9,7 +9,7 @@
   "host_permissions": [
     "*://*.youtube.com/*"
   ],
-"content_scripts": [
+  "content_scripts": [
     {
       "matches": ["*://*.youtube.com/*"],
       "js": ["content/youtube.js"],
@@ -17,7 +17,14 @@
       "run_at": "document_end"
     }
   ],
-  "background": {
-    "service_worker": "background/service-worker.js"
+"background": {
+    "service_worker": "background/service-worker.js",
+    "scripts": ["background/service-worker.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ytcatalog@example.com",
+      "strict_min_version": "109.0"
+    }
   }
 }

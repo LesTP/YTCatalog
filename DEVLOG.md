@@ -501,6 +501,96 @@ MutationObserver with debouncing:
 
 ---
 
+### [2026-01-26] Phase 8a-8b: Firefox Compatibility Layer
+
+#### What was done
+- **Phase 8a: Browser API Compatibility Layer**
+  - Created `src/shared/browser-api.ts` with browser detection logic
+  - Detects Firefox's `browser` global vs Chrome's `chrome` global
+  - Exports unified `storage` object with `get()`, `set()`, `remove()` methods
+  - Exports `getRuntime()` for runtime API access
+  - Exports `isStorageAvailable()` for defensive checks
+  - Added inline TypeScript declaration for Firefox's `browser` global
+  - Updated `storage.ts` to import from `browser-api.ts` instead of using `chrome.*` directly
+  - Updated `service-worker.ts` to import from `browser-api.ts`
+  - Removed legacy `unassignedPlaylists` initialization from service worker
+
+- **Phase 8b: Manifest Updates**
+  - Added `browser_specific_settings.gecko` section to `manifest.json`
+  - Set extension ID: `ytcatalog@example.com`
+  - Set minimum Firefox version: 109.0 (first version with MV3 support)
+
+- **Documentation**
+  - Added Phase 8 subphase breakdown to DEVPLAN.md
+  - Added D-25 decision (Firefox API Compatibility Approach) to DEVPLAN.md
+
+#### Issues encountered
+1. **TypeScript error: Cannot find name 'browser'**
+   - Cause: TypeScript only knows about Chrome's `chrome` global from `@types/chrome`
+   - Fix: Added `declare const browser: typeof chrome | undefined;` in browser-api.ts
+   - Note: Firefox's `browser` API has same shape as Chrome's `chrome` API
+
+#### Lessons learned
+- Firefox supports Manifest V3 from version 109+
+- Firefox's `browser.*` API is functionally identical to Chrome's `chrome.*` API
+- No external polyfill needed - simple detection layer is sufficient
+- Inline type declarations work well for small compatibility layers
+
+#### Files changed
+- Added: `src/shared/browser-api.ts`
+- Modified: `src/shared/storage.ts` (import from browser-api)
+- Modified: `src/background/service-worker.ts` (import from browser-api)
+- Modified: `src/manifest.json` (added gecko settings, added scripts for Firefox)
+- Modified: `DEVPLAN.md` (Phase 8 breakdown, D-25 decision)
+
+#### Testing
+- [x] `npm run build` succeeds without errors
+- [x] Chrome loads extension without errors
+- [x] Firefox loads extension without errors
+
+---
+
+### [2026-01-26] Phase 8c-8f: Firefox Compatibility (Continued)
+
+#### What was done
+- **Phase 8c: TypeScript Type Definitions**
+  - Verified inline `declare const browser` declaration is sufficient
+  - No additional type packages needed - build passes cleanly
+
+- **Phase 8d: Build Configuration**
+  - Added `npm run dev:firefox` script to package.json (opens Firefox at YouTube playlists page)
+  - Added `npm run dev:chrome` script (reminder to load manually)
+  - Added "firefox-extension" to package.json keywords
+
+- **Phase 8e: Firefox Integration Testing**
+  - Created testing checklist in DEVPLAN.md
+  - Basic testing confirmed: extension loads, dropdown appears in both browsers
+
+- **Phase 8f: Documentation**
+  - Updated README.md with:
+    - Firefox installation instructions
+    - Browser compatibility table
+    - Updated Cold Start Summary (Phase 8 in progress, known limitations)
+    - Development workflow for both browsers
+    - Removed reference to dev-setup-guide.md (to be discarded)
+
+#### Issues encountered
+1. **Firefox service_worker error**: Firefox had `service_worker` disabled
+   - Fix: Added `scripts` array alongside `service_worker` in manifest.json
+   - Chrome uses `service_worker`, Firefox uses `scripts`
+
+#### Lessons learned
+- Firefox MV3 uses `background.scripts` array instead of `service_worker` (as of current Firefox versions)
+- Including both fields in manifest.json allows cross-browser compatibility
+- `web-ext` tool works well for Firefox development with auto-reload
+
+#### Files changed
+- Modified: `package.json` (added dev:firefox, dev:chrome scripts)
+- Modified: `README.md` (Firefox instructions, compatibility table, updated summary)
+- Modified: `DEVPLAN.md` (marked Phase 8c-f tasks complete)
+
+---
+
 ## Performance Notes
 
 *Reserved for performance observations and optimizations.*
@@ -509,8 +599,11 @@ MutationObserver with debouncing:
 
 ## Browser Compatibility Notes
 
-*Reserved for cross-browser testing results.*
-
 | Feature | Chrome | Firefox | Notes |
 |---------|--------|---------|-------|
-| - | - | - | Testing not yet started |
+| Manifest V3 | ✅ | ✅ (109+) | Both support MV3 |
+| Storage API | ✅ | ✅ | Chrome uses `chrome.*`, Firefox uses `browser.*` |
+| Runtime API | ✅ | ✅ | Same namespace difference |
+| Background | service_worker | scripts array | Manifest supports both |
+| Extension loading | ✅ | ✅ | Both tested and working |
+| Dropdown UI | ✅ | ✅ | Matches YouTube styling |

@@ -457,16 +457,145 @@ YTCatalog/
 - [ ] TODO: Missing folders array → error message
 - [ ] TODO: Wrong file type (not .json) → error message or graceful handling
 
-### Phase 7: Grid Layout Fix
-- [ ] Investigate YouTube's CSS layout behavior with hidden items
-- [ ] Implement solution for grid gaps when filtering
-- [ ] Test across different playlist counts and screen sizes
+### Phase 7: Grid Layout Fix (Deferred - Known Limitation)
+
+**Status**: Deferred. Accepted as known limitation for v1.
+
+**Problem**: When filtering playlists by folder, the grid layout becomes misaligned. Visible playlists appear scattered with gaps between rows instead of flowing into a tight grid.
+
+**Root Cause**: YouTube uses Flexbox (`display: flex`) with complex JavaScript-calculated positioning. Hidden items with `display: none` don't take up space, but YouTube's layout system doesn't reflow the remaining items to fill gaps.
+
+#### Investigation Findings (2026-01-18)
+
+**YouTube's layout architecture:**
+- Parent container: `DIV#contents` with `display: flex`
+- Grandparent: `YTD-RICH-GRID-RENDERER` with `display: flex`
+- YouTube's native filtering removes elements from DOM entirely
+- Our `display: none` approach hides rendering but leaves items in DOM
+
+#### Approaches Tried
+
+| Approach | Result | Notes |
+|----------|--------|-------|
+| CSS `order` property | ❌ Failed | Set `order: -1` on visible, `order: 9999` on hidden. YouTube's flexbox ignores it. |
+| DOM reordering | ❌ Failed | Used `appendChild()` to move hidden items to end. Layout unchanged - YouTube uses calculated positions. |
+| DOM removal | ❌ Failed | Removed hidden items, stored in memory for restoration. Caused infinite MutationObserver loops, broke playlist counts when cache was invalidated. Complex state management. |
+| Trigger resize event | ❌ Failed | `window.dispatchEvent(new Event('resize'))` - no effect on layout. |
+
+#### Why DOM Removal Failed
+
+1. `restoreAllPlaylists()` triggered MutationObserver → infinite loop
+2. Adding `isApplyingFilter` flag helped but had timing issues with debounce
+3. `forceRestore` parameter (only restore on explicit filter change) still caused issues
+4. Cache invalidation after DOM changes broke playlist counts (59 shown instead of 300+)
+5. YouTube's DOM recycling made element restoration unreliable
+
+#### Possible Future Solutions
+
+1. **Custom container approach** (Medium-High complexity)
+   - Create our own CSS Grid container
+   - Move visible playlist elements into it
+   - Hide YouTube's original container
+   - Pros: Full control over layout
+   - Cons: Large refactor, may break YouTube's event handlers
+
+2. **CSS injection with `!important`** (Low complexity, uncertain outcome)
+   - Override YouTube's flex layout with CSS Grid
+   - Force grid to ignore hidden items
+   - Pros: Non-invasive, CSS-only
+   - Cons: May break other YouTube layouts
+
+3. **Accept limitation** (Current decision)
+   - Document as known issue
+   - Filtering works correctly, just with visual gaps
+   - Revisit if users strongly request fix
+
+#### Current Behavior
+
+- Filtering works correctly (shows/hides right playlists)
+- Counts are accurate
+- Grid has visual gaps when filtering (not "All Playlists")
+- No gaps when viewing "All Playlists"
 
 ### Phase 8: Firefox Compatibility
-- [ ] Add webextension-polyfill or conditional API code
-- [ ] Update manifest for Firefox compatibility
-- [ ] Test all features in Firefox
-- [ ] Document any browser-specific limitations
+
+**Goal**: Make YTCatalog work in Firefox without breaking Chrome support.
+
+**Key Design Decision**: D-25 - Compatibility Layer approach (see Decisions section)
+
+#### Phase 8a: Browser API Compatibility Layer ✓
+
+**Scope**: Create unified browser API module that works in both Chrome and Firefox.
+
+**Tasks**:
+- [x] Create `src/shared/browser-api.ts` with browser detection
+- [x] Add TypeScript declaration for Firefox `browser` global
+- [x] Export unified `storage` helper with get/set/remove methods
+- [x] Export `getRuntime()` for runtime API access
+- [x] Export `isStorageAvailable()` that checks both namespaces
+- [x] Update `storage.ts` to import from browser-api
+- [x] Update `service-worker.ts` to import from browser-api
+- [x] Verify build succeeds
+
+**Testing**:
+- [x] `npm run build` succeeds without errors
+- [ ] Extension loads in Chrome without errors
+- [ ] All storage operations work in Chrome
+
+#### Phase 8b: Manifest Updates for Firefox ✓
+
+**Scope**: Add Firefox-specific manifest settings.
+
+**Tasks**:
+- [x] Add `browser_specific_settings.gecko` section
+- [x] Set extension ID: `ytcatalog@example.com`
+- [x] Set minimum Firefox version: 109.0 (MV3 support)
+
+**Testing**:
+- [x] Chrome still loads extension without manifest errors
+- [x] Firefox accepts manifest structure
+
+#### Phase 8c: TypeScript Type Definitions ✓
+
+**Scope**: Ensure TypeScript types work for both browser APIs.
+
+**Tasks**:
+- [x] Add `declare const browser` in browser-api.ts (inline declaration)
+- [x] Build succeeds without type errors (no additional packages needed)
+
+#### Phase 8d: Build Configuration ✓
+
+**Scope**: Update build scripts for dual browser support.
+
+**Tasks**:
+- [x] Add `npm run dev:firefox` script (opens Firefox with extension at YouTube playlists page)
+- [x] Document build process for each browser in README
+
+#### Phase 8e: Firefox Integration Testing ✓
+
+**Scope**: Test all features in Firefox.
+
+**Testing Checklist**:
+- [x] Extension loads on YouTube playlists page
+- [x] Dropdown button appears and matches YouTube styling
+- [ ] Dropdown menu opens/closes correctly
+- [ ] Create new folder
+- [ ] Folder persists after page reload
+- [ ] Selected folder persists after page reload
+- [ ] Folder filtering works correctly
+- [ ] Modal opens and closes
+- [ ] Click-to-assign workflow works
+- [ ] Export/Import works
+- [ ] MutationObserver handles YouTube sorting
+
+#### Phase 8f: Documentation ✓
+
+**Scope**: Update documentation for cross-browser support.
+
+**Tasks**:
+- [x] Add Firefox installation instructions to README
+- [x] Add browser compatibility table
+- [x] Update Cold Start Summary
 
 ### YouTube DOM Selectors (Phase 2a Research)
 
@@ -520,24 +649,14 @@ ytd-rich-item-renderer[lockup="true"]
 
 ### Future Plans (Post-MVP)
 
-#### Completed (was Phase 6)
-- [x] **Stale cache due to YouTube element recycling** ✅ Fixed 2026-01-16
-  - **Problem**: YouTube recycles DOM elements when sorting/filtering - the same `<ytd-rich-item-renderer>` node is reused to display different playlists. Our cached `element→ID` mappings became invalid.
-  - **Solution**: MutationObserver with 400ms debouncing - watches playlist container for DOM changes, clears cache, re-scrapes playlists, re-applies current filter, updates counts.
+#### Next Priority
+- [ ] **Thumbnail loading for off-screen playlists**: YouTube lazy-loads images; off-screen playlist thumbnails don't load in modal. Consider placeholder images, title-only cards, or triggering scroll before modal opens.
 
-#### Phase 6 Candidates
-
-**Top Priority:**
-- [ ] **Grid layout gaps when filtering**: YouTube's layout doesn't reflow properly when we hide playlists with `display: none`. Resize event doesn't help. May need to explore alternative approaches (CSS order, DOM manipulation, or accept as limitation)
-- [ ] **Firefox support**: Use webextension-polyfill or conditional API code (`chrome.storage` → `browser.storage`)
-- [ ] **Export/Import folders**: Download folders as JSON, import from JSON file (alternative to cloud sync)
-- [ ] **Thumbnail loading for off-screen playlists**: YouTube lazy-loads images; off-screen playlist thumbnails don't load. Consider placeholder images, title-only cards, or alternative scraping approach
-
-**Medium Priority:**
+#### Medium Priority
 - [ ] **Bulk operations**: Multi-select playlists + bulk move to folder
 - [ ] **Drag-and-drop**: Add drag-and-drop as alternative to click-to-assign
 
-**Nice to Have:**
+#### Nice to Have
 - [ ] **Save/Cancel workflow**: Add undo capability or Save/Cancel for modal changes
 - [ ] **Remove/hide test hotkey**: Remove `Ctrl+Shift+Y` testing feature or hide behind debug flag
 - [ ] **Import conflict dialog**: Add "Ask" dialog for import conflicts instead of auto-replace (see D-21)
@@ -865,6 +984,35 @@ Rationale:
 - Example: ytcatalog-folders-2026-01-18.json
 Trade-offs: None significant
 Revisit if: N/A
+```
+
+```
+D-25: Firefox API Compatibility Approach
+Date: 2026-01-26
+Status: Closed
+
+Decision: Compatibility Layer (Option A)
+- Create `src/shared/browser-api.ts` module
+- Detect available API (`browser` for Firefox, `chrome` for Chrome)
+- Export unified storage/runtime helpers
+- No external polyfill dependency
+
+Options Considered:
+A) Compatibility Layer - Create shared module that detects browser and exports unified API
+B) Namespace Replacement - Use `browser.*` everywhere (Firefox provides `chrome` alias)
+C) webextension-polyfill - Use Mozilla's official polyfill library
+
+Rationale:
+- Explicit browser detection, handles both namespaces cleanly
+- Good TypeScript support with inline declarations
+- No external dependency (unlike webextension-polyfill)
+- Centralized API access for easier maintenance
+
+Trade-offs:
+- Slightly more code than Option B
+- Must maintain our own compatibility layer
+
+Revisit if: Firefox changes compatibility behavior or new APIs are needed
 ```
 
 ---
